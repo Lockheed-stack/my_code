@@ -24,7 +24,7 @@ This is generally not what was intended. A way around this is to use 'None' as t
 it in the body of the function.
 '''
 # %%
-''' 也就是说参数中由'mutable'类型的变量，要设置为'None'。修改如下: '''
+''' 也就是说参数中有'mutable'类型的变量，要设置为'None'。修改如下: '''
 class Player:
     def __init__(self,name,items=None) -> None:
         self.name = name
