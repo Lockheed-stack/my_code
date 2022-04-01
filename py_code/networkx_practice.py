@@ -1,4 +1,5 @@
 # %%
+import matplotlib.pyplot as plt
 import networkx as nx
 # %%
 '''
@@ -92,5 +93,73 @@ G.add_edge(1, 3)
 G[1][3]['color'] = "blue"
 G.edges[1, 2]['color'] = "red"
 G.edges[1, 2]
+
+# %%
+'''用更快的查看所有顶点对(node,adjacency)'''
+# 对于无向图，迭代的时候相同的边会输出两次
+FG = nx.Graph()
+FG.add_weighted_edges_from([(1, 2, 0.125), (1, 3, 0.75), (2, 4, 1.2), (3, 4, 0.375)])
+for n,nbrs in FG.adj.items():
+    for nbr,eattr in nbrs.items():
+        wt = eattr['weight']
+        if wt<0.5:
+            print(f"({n},{nbr},{wt:.3})")
+            
+
+for (u,v,wt) in FG.edges.data('weight'):
+    if wt < 0.5:
+        print(f"({u},{v},{wt:.3})")
+# %%
+'''给图、点、边添加/修改属性'''
+G = nx.Graph(day="Friday")
+G.graph
+G.graph['day']='Sunday'# 改成周一
+G.graph
+
+G.add_node(1,time="5pm")
+G.add_nodes_from([3,4,5],time='2pm')
+G.nodes[1]['room']=666 # 再给顶点1添加一个新的属性
+G.nodes.data()
+
+G.add_edge(1,2,weight=2.7)
+G.add_edges_from([(3,4),(4,5)],color='red')
+G.add_edges_from([(1,2,{'color':'blue'})
+                  ,(2,3,{'weight':8})])
+G[1][2]['weight']=7
+G.edges[3,4]['weight']=3.3
+G.edges.data()
+# %%
+'''有向图，提供了一些新方法,包括但不限于以下方法'''
+DG = nx.DiGraph()
+DG.add_weighted_edges_from([(1,2,0.5),(3,1,0.3)])
+DG.out_degree(1,weight='weight')# weight这参数不指定，则默认边的权重为1；指定了就去计算指定属性的sum；如果找不到这属性，和不指定的效果一样
+list(DG.successors(1))
+list(DG.neighbors(1))
+# %%
+'''多重图(multigraphs),即顶点之间可以有多条边'''
+MG = nx.MultiGraph()
+MG.add_weighted_edges_from([(1,2,0.5),(1,2,0.75),(2,3,0.45)])
+dict(MG.degree(weight='weight'))
+GG = nx.Graph()
+for n,nbrs in MG.adjacency():
+    for nbr,edict in nbrs.items():
+        minivalue = min([d['weight'] for d in edict.values()])
+        GG.add_edge(n,nbr,weight=minivalue)
+nx.shortest_path(GG,1,3)
+# %%
+'''分析图.就是一些分析图的算法，官网已经实现了一些'''
+G = nx.Graph()
+G.add_edges_from([(1,2),(1,3)])
+G.add_node("spam")
+list(nx.connected_components(G))# 查看图G的连通分量
+sorted(d for n,d in G.degree())
+nx.clustering(G)
+# %%
+'''画图'''
+G = nx.petersen_graph()# 创建一个皮特森图
+subax1 = plt.subplot(121)
+nx.draw(G,with_labels=True,font_weight='bold')
+subax2 = plt.subplot(122)
+nx.draw_shell(G,nlist=[range(5,10),range(5)],with_labels=True,font_weight='bold')
 
 # %%
