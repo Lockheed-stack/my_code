@@ -38,6 +38,7 @@ p3 = Player("Charles",["sword"])
 p1.items.append("armor")
 p2.items.append("sword")
 print(p1.items)
+print(p3.items)
 # %%
 '''迭代器iterator,是一个数据流对象, 可以用next从这个对象中获取数据'''
 '''iterable, 可迭代对象,是一个对象'''
@@ -124,7 +125,10 @@ def penta(x):
 print(penta)
 
 #进阶例子
+from asyncio.windows_events import NULL
+from msilib.schema import Class
 import time
+from tkinter.messagebox import NO
 def timeit(f):
     def wrapper(*args,**kwargs):#允许变长的函数参数
         start = time.time()
@@ -140,4 +144,38 @@ def my_func(x):
     
 print(my_func(1))
 
+# %%
+class my_iter:
+    
+    def __init__(self,iter_obj=None) -> None:
+        self.curStatus = iter_obj
+        self.id=iter_obj.id
+        self.value = iter_obj.value
+
+    def __next__(self):
+        if self.curStatus is None:
+            raise StopIteration
+        self.id +=1
+        self.value=self.curStatus.value
+        self.curStatus=self.curStatus.next
+        return self.id,self.value
+        
+class iter_obj:
+    value=None
+    id = 0
+    def __init__(self,value=None,id=0) -> None:
+        self.value=value
+        self.id=id
+        self.next = None
+        
+    def __iter__(self):
+        return my_iter(self)
+            
+a = iter_obj("test",0)
+b = iter_obj('qwer',)
+c = iter_obj('ffff')
+a.next=b
+b.next=c
+for id,value in a:
+    print(f'{id},{value}')
 # %%
