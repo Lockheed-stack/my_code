@@ -90,8 +90,8 @@ def progress_bar(cur_progress, total_progress, start_time):
     #     print('')
 # %%
 if __name__=='__main__':
-    G = nx.read_adjlist('./SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
-    output=score_LRW(G,6,256)
+    G = nx.read_adjlist('../SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
+    output=score_LRW(G,6,8777)
 # %%
 output
 # %%
