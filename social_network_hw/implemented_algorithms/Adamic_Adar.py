@@ -2,7 +2,7 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 # %%
-G = nx.read_adjlist('./SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
+#G = nx.read_adjlist('./SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
 # %%
 def Adamic_Adar(G,node_x):
     ## Return a dict of Adamin Adar index
@@ -18,7 +18,8 @@ def Adamic_Adar(G,node_x):
     trimed_AA_index={}
     for node in AA_index.keys():
         if node not in nx.neighbors(G,node_x):
-            if AA_index[node]!=0:
-                trimed_AA_index[node]=AA_index[node]
-            
-    return trimed_AA_index
+            #if AA_index[node]!=0:
+            trimed_AA_index[node]=AA_index[node]
+    
+    sorted_trimed_AA_index= sorted(trimed_AA_index.items(),key=lambda kv:kv[1],reverse=True)   
+    return sorted_trimed_AA_index
