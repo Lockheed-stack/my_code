@@ -21,7 +21,6 @@ def create_transition_probability_matrix(G):
     return t_p_m
 
 # %%
-#@profile
 def local_random_walk(time_steps,start_node,num_of_nodes,trans_prob_matrix):
     '''
     return a probability list after t steps
@@ -39,7 +38,6 @@ def local_random_walk(time_steps,start_node,num_of_nodes,trans_prob_matrix):
         
     return t_step_output
 # %%
-#@profile
 def score_LRW(G,time_steps,start_node):
     '''
     return a sorted dictionary of potential link for start node
@@ -88,7 +86,7 @@ def score_LRW(G,time_steps,start_node):
 #                                             completed, uncompleted, (time_now-start_time)), end='',flush=True)
 #     if (cur_progress) >= total_progress:
 #         print(' ,Done')
-# # %%
+# %%
 # if __name__=='__main__':
 #     G = nx.read_adjlist('../SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
 #     output=score_LRW(G,6,8777)

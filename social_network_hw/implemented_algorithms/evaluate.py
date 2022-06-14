@@ -16,17 +16,18 @@ def AUC(output,G_test,node):
         if i[0] in nx.neighbors(G_test,node):
             missing_edge[i[0]]=i[1]
     
-    n1,n2 = 0,0
+    n1,n2,compare_count= 0,0,0
     for edge in missing_edge.items():
         for i in output:
             if i[0] not in nx.neighbors(G_test,node):#non-existent edge
+                compare_count+=1
                 if edge[1]<i[1]:
                     continue
                 elif edge[1]>i[1]:
                     n1+=1
                 else:
                     n2+=1
-    n = len(missing_edge)*len(output)
+    n = compare_count
     if n==0:
         auc=0
     else:

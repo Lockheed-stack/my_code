@@ -138,8 +138,8 @@ def score_ISRW(G,time_steps,start_node):
 #         print(' ,Done')
 
 # %%
-if __name__=='__main__':
-    G = nx.read_adjlist('../SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
-    output = score_ISRW(G,5,8777)
-#%%
-output
+# if __name__=='__main__':
+#     G = nx.read_adjlist('../SCHOLAT Link Prediction/train.csv',nodetype=int,delimiter=',')
+#     output = score_ISRW(G,5,8777)
+# #%%
+# output
