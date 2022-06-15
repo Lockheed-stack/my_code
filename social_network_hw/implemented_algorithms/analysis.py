@@ -34,8 +34,8 @@ def start_analysis(G_sample_edge=None,G_train=None,G_test=None,sample_rate=1.0,e
         all_node_auc_ilrw=[]
         all_node_auc_srw=[]
         all_node_auc_isrw=[]
-        time_steps = step_decision(G_train)
-        
+        #time_steps = step_decision(G_train)
+        time_steps = 5
         already_test_nodes={}
         if sample_rate==1.0:
             sample_rate_edges=G_sample_edge
@@ -225,7 +225,7 @@ np.shape(a)
 np.mean(a)
 # %%
 G = G_scholat_train.subgraph(max(nx.connected_components(G_scholat_train),key=len))
-G.number_of_nodes()
+nx.radius(G)
 # %%
 G.number_of_edges()
 # %%
@@ -301,6 +301,34 @@ plt.savefig('../outpic/dolphins_auc.jpg',dpi=300,bbox_inches='tight')
 plt.show()
 # %%
 sci_auc = start_analysis(G_netScience_sample_edges,G_netScience_train,G_netScience,sample_rate=0.1,exec_srw=True)
-dolphins_auc_df = pandas_process(dolphins_auc)
-dolphins_auc_df
+
+# %%
+sci_auc_df = pandas_process(sci_auc)
+sci_auc_df
+# %%
+sci_auc_df.plot()
+# %%
+sci_auc_df.to_csv('../output_table/pandas_proc_netSci.csv')
+# %%
+G_scholat_sample_edges = pd.DataFrame(nx.edges(G_scholat_test)).sample(frac=0.01,replace=False).values
+schot_auc = start_analysis(G_scholat_sample_edges,G_scholat_train,G_scholat_test,sample_rate=0.05,)
+schot_auc_df = pandas_process(schot_auc)
+schot_auc_df
+# %%
+schot_auc_analysis_df = pd.DataFrame(schot_auc)
+schot_auc_analysis_df
+# %%
+schot_auc_analysis_df.to_csv('../output_table/schot_auc_result.csv')
+# %%
+fig,ax = plt.subplots()
+ax.plot(schot_auc_df,marker='*')
+ax.legend(schot_auc_df.columns)
+ax.set_xticks(np.arange(0.1,1.1,0.1))
+ax.set_xlabel('Observed fraction')
+ax.set_ylabel('AUC')
+ax.set_title('Scholat')
+plt.ylim([0.8,1.0])
+plt.savefig('../outpic/scholat_auc.jpg',dpi=300,bbox_inches='tight')
+
+plt.show()
 # %%

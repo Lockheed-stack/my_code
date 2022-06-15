@@ -2,6 +2,7 @@
 import networkx as nx
 import pandas as pd 
 import numpy as np
+import torch
 #%%
 def AUC(output,G_test,node):
     '''
@@ -101,24 +102,27 @@ def roc_calc(G_train,G_test,sample_edges,score_callback_func,Is_rw=False,time_st
                         y_true.append(0)
                     scores.append(node_y[1])
     else:
+        tensor_scores = []
         for node in sample_edges:
             if node[0] not in already_test_nodes:
                 already_test_nodes[node[0]]=1
                 score_res = score_callback_func(G_train,time_step,node[0])
                 for node_y in score_res:
-                    if node_y[0] in nx.neighbors(G_test,time_step,node[0]):
+                    if node_y[0] in nx.neighbors(G_test,node[0]):
                         y_true.append(1)
                     else:
                         y_true.append(0)
-                    scores.append(node_y[1])
+                    tensor_scores.append(node_y[1])
             if node[1] not in already_test_nodes:
                 already_test_nodes[node[1]]=1
                 score_res = score_callback_func(G_train,time_step,node[1])
                 for node_y in score_res:
-                    if node_y[0] in nx.neighbors(G_test,time_step,node[1]):
+                    if node_y[0] in nx.neighbors(G_test,node[1]):
                         y_true.append(1)
                     else:
                         y_true.append(0)
-                    scores.append(node_y[1])
-    
+                    tensor_scores.append(node_y[1])
+        for t in tensor_scores:
+            scores.append(torch.Tensor.cpu(t))
+            
     return y_true,scores
