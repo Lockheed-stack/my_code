@@ -90,8 +90,8 @@ def gen(num):#生成器函数
     
 g = gen(5) # g是生成器对象，gen这个函数返回的不是具体的值，返回一个生成器对象
 first = next(g)#使用next，此时才会运行函数本体
-print("fitst:",first)
-print("sned:",g.send(10))#sned就是在生成器yield之后，把yield的东西变成一个值，可继续赋给生成器中的其他变量
+print("first:",first)
+print("send:",g.send(10))#send就是在生成器yield之后，把yield的东西变成一个值，可继续赋给生成器中的其他变量
 for i in g:#相当于每一次都call 一次 next.相当于g.send(None)
     print(i)
 # %%
