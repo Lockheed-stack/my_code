@@ -1,6 +1,9 @@
 #%%
 import networkx as nx
 import numpy as np
+import math
+import pandas as pd
+from tqdm import tqdm
 # %%
 def all_combination(num_of_selection:int,boundary:int):
     result:list = []
@@ -75,35 +78,72 @@ def create_spanning_subgraph(G):
     #pick out all kinds of selections
     for i in range(1,num_of_selections+1):
         selection_dict[i]=all_combination(i,nx.number_of_edges(G))
+
     
     for select in selection_dict.items():
-        subgraph1 = []
-        subgraph2 = []
-        for index in select[1]:
-            selected_edge_1 = []
-            selected_edge_2 = []
-            # 得到一种组合便可得到两种选法
+        with tqdm(total=len(select[1])) as qbar:
+            subgraph1 = []
+            subgraph2 = []
+            for index in select[1]:
+                selected_edge_1 = []
+                selected_edge_2 = []
+                # 得到一种组合便可得到两种选法
+                
+                # 第一种选法
+                for i in index:
+                    selected_edge_1.append(edge_list[i])
+                G_temp = G.copy()
+                G_temp.remove_edges_from(selected_edge_1)
+                if isomorphism_check(subgraph1,G_temp) == False and nx.is_connected(G_temp):
+                    subgraph1.append(G_temp)
+                
+                # 第二种选法
+                for i in range(nx.number_of_edges(G)):
+                    if i not in index:
+                        selected_edge_2.append(edge_list[i])
+                G_temp = G.copy()
+                G_temp.remove_edges_from(selected_edge_2)
+                if isomorphism_check(subgraph2,G_temp) == False and nx.is_connected(G_temp):
+                    subgraph2.append(G_temp)   
+                
+                qbar.update(1)
+                
+            spanning_subgraph_dict[select[0]] = subgraph1
+            spanning_subgraph_dict[nx.number_of_edges(G)-select[0]] = subgraph2
             
-            # 第一种选法
-            for i in index:
-                selected_edge_1.append(edge_list[i])
-            G_temp = G.copy()
-            G_temp.remove_edges_from(selected_edge_1)
-            if isomorphism_check(subgraph1,G_temp) == False and nx.is_connected(G_temp):
-                subgraph1.append(G_temp)
-            
-            # 第二种选法
-            for i in range(nx.number_of_edges(G)):
-                if i not in index:
-                    selected_edge_2.append(edge_list[i])
-            G_temp = G.copy()
-            G_temp.remove_edges_from(selected_edge_2)
-            if isomorphism_check(subgraph2,G_temp) == False and nx.is_connected(G_temp):
-                subgraph2.append(G_temp)   
-        spanning_subgraph_dict[select[0]] = subgraph1
-        spanning_subgraph_dict[nx.number_of_edges(G)-select[0]] = subgraph2
     
     return spanning_subgraph_dict
 # %%
+def random_create_spanning_subgraph(G:nx.Graph,target_num:int):
+    
+    if target_num>math.comb(nx.number_of_edges(G),int(nx.number_of_edges(G)/2)):
+        print("invalid target num")
+        return 
 
+    spanning_subgraph_dict={}
+    edge_list = list(nx.edges(G))
+    edge_num = nx.number_of_edges(G)
+    df = pd.DataFrame(edge_list)
+    actually_get = 0
+    curr_num = 0
+
+    while(curr_num<target_num):
+        select_num = np.random.randint(1,edge_num)
+        select_np = df.sample(select_num,replace=False).to_numpy()
+        selection_edges=[]
+        if select_num not in spanning_subgraph_dict.keys():
+            spanning_subgraph_dict[select_num]=[]
+
+        for edge in select_np:
+            selection_edges.append(tuple(edge))
+        
+        G_temp = G.copy()
+        G_temp.remove_edges_from(selection_edges)
+        if isomorphism_check(spanning_subgraph_dict[select_num],G_temp) == False and nx.is_connected(G_temp):
+            spanning_subgraph_dict[select_num].append(G_temp)
+            actually_get+=1
+        curr_num+=1
+
+    print(f"target:{target_num}, actually get:{actually_get}")
+    return spanning_subgraph_dict
 # %%
