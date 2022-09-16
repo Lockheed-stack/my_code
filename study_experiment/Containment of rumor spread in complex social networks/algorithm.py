@@ -1,8 +1,9 @@
 #%%
-from random import seed
+from typing import Callable
 import networkx as nx
 import numpy as np
 import LTD1DT
+import scipy.sparse
 # %%
 class unconstrained_algorithm:
     def __init__(self,) -> None:
@@ -25,7 +26,7 @@ class unconstrained_algorithm:
         test_model = model.copy()
         test_model.update_seed_R(seed_R,True)
 
-        G , final_R , final_T = test_model.diffusion()
+        G , final_R , final_T, R_t_receiver = test_model.diffusion()
         final_R_num = len(final_R)
         
 
@@ -52,6 +53,19 @@ class unconstrained_algorithm:
                 # temp_model.update_seed_T(seed_T)
 
         return seed_T
+
+    def pagerank(self,G:nx.Graph,alpha:float=0.85):
+        '''Calculating the Pagerank value of G
+
+        Parameters
+        ------------
+        G: nx.Graph
+            A Networkx Graph
+        alpha: float, optional
+            Damping parameter for PageRank, default=0.85.
+        '''
+        trans_mat = nx.adjacency_matrix(G,dtype=float).toarray()
+
 # %%
 
 '''------------------ test below -----------------------'''
@@ -59,5 +73,17 @@ G = nx.Graph()
 G.add_edges_from([(1,2),(1,7),(2,3),(3,4),(3,5),(4,6),(7,6),(7,8),(8,9),(9,5)])
 nx.draw_networkx(G,pos=nx.circular_layout(G),with_labels=True,font_color='white')
 #%%
-
+model = LTD1DT.model_V2(G,False,[],[6,8])
+G2 = model.get_initialized_G()
+nx.get_node_attributes(G2,'status')
+# %%
+nx.get_node_attributes(G2,'i_threshold')
+#%%
+nx.get_node_attributes(G2,'d_threshold')
+# %%
+result = model.diffusion()
+#%%
+a = nx.adjacency_matrix(G,[i for i in range(0,9)]).toarray()
+# %%
+a
 # %%

@@ -80,9 +80,9 @@ class model_V2:
 
         Return
         --------------
-        (G , final_R_receiver , final_T_receiver) : tuple
-            A Networkx's Graph which simulated diffusion has been completed, 
-            final_R_receiver and final_T_receiver
+        (G , final_R_receiver , final_T_receiver, R_t_receiver) : tuple
+            A Networkx's Graph which simulated diffusion has been completed. 
+            final_R_receiver,final_T_receiver and  R_t_receiver are dict.
         '''
         if not is_apply:
             G = nx.Graph(self.G)
@@ -94,15 +94,15 @@ class model_V2:
             final_R_receiver = self.final_R_receiver
             final_T_receiver = self.final_T_receiver
 
-        # if seed_T is not None:
-        #     for node in seed_T:
-        #         G.nodes[node]['status']='T-active'
-        #         final_T_receiver[node] = 'T'
+        R_t_receiver = {0:[node for node in final_R_receiver.keys()]} # Nodes activated by rumor at time t
         
         # nothing_change = False
         R_num = -1
         T_num = -1
+        time_step = 1
+
         while(R_num-len(final_R_receiver) or T_num-len(final_T_receiver)):
+            
 
             # nothing_change = True
             R_num = len(final_R_receiver)
@@ -124,13 +124,17 @@ class model_V2:
                             if flag == 1:
                                 final_R_receiver[node]='R'
                                 G.nodes[node]['status'] = 'R-active'
+                                R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
                             elif flag == 2:
                                 final_T_receiver[node]='T'
                                 G.nodes[node]['status']='T-active'
                                 if node in  final_R_receiver:
                                     final_R_receiver.pop(node)
-        
-        return G , final_R_receiver , final_T_receiver
+            
+            time_step+=1
+
+
+        return G , final_R_receiver , final_T_receiver , R_t_receiver
 
     def __check_i_threshold(self,node,G:nx.Graph):
         influenced_num = 0
@@ -189,7 +193,7 @@ class model_V2:
 
         Note
         -------------
-        Only inactive node will be changed. If status of node is R-active or T-active, it will
+        Only inactive node will be changed when override is False. If status of node is R-active or T-active, it will
         omit this update.
         '''
         
@@ -227,7 +231,7 @@ class model_V2:
 
         Note
         -------------
-        Only inactive node will be changed. If status of node is R-active or T-active, it will
+        Only inactive node will be changed when override is False. If status of node is R-active or T-active, it will
         omit this update.
         '''
         
