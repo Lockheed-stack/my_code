@@ -102,8 +102,56 @@ class unconstrained_algorithm:
                 return p
         raise nx.PowerIterationFailedConvergence(iter_num)
 
-    def ContrId(self,):
-        pass
+    def ContrId(self,k:int=1,model:LTD1DT.model_V2=None):
+        '''Contributors Identification
+
+        Parameters:
+        ---------------
+        k: int 
+            To decide how many truth node will be chosen. Default = 1.
+        model: LTD1DT.model_V2
+            A LTD1DT model.
+
+        Return:
+        ----------------
+        seed_T : list
+            A list of seed_T of top
+        Note:
+        ------------------
+            coming soon
+        '''
+        seed_T = {}
+        if model is None:
+            print('a model need to be given.')
+            return
+        else:
+            temp_model = model.copy()
+            temp_model.update_seed_T([],override=True)
+            res = temp_model.diffusion()
+        
+        node_ctr = {}
+        for node in nx.get_node_attributes(res[0],'active_time').items():
+            ctr = 0 # contribution
+            for nbr in nx.neighbors(res[0]):
+                if nbr in nx.get_node_attributes(res[0],'active_time'):
+                    ctr+=1
+            node_ctr[node]=ctr
+
+        if k>len(node_ctr):
+            print(f'cannot find k truth nodes, only {len(node_ctr)} nodes found.')
+            return node_ctr    
+        else:
+            while(k):
+                max_ctr = 0
+                for node in node_ctr.items():
+                    if node[1]>max_ctr:
+                        chosen_node = node[0]
+                        max_ctr = node[1]
+                seed_T[chosen_node] = max_ctr
+                node_ctr.pop(chosen_node)
+                k-=1
+        
+        return seed_T
 
 # %%
 
@@ -124,6 +172,4 @@ result = model.diffusion()
 #%%
 un_al = unconstrained_algorithm()
 un_al.pagerank(G,)
-# %%
-nx.pagerank(G)
 # %%

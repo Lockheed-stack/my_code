@@ -80,8 +80,9 @@ class model_V2:
 
         Return
         --------------
-        (G , final_R_receiver , final_T_receiver, R_t_receiver) : tuple
+        (G ,time_step ,final_R_receiver , final_T_receiver, R_t_receiver) : tuple
             A Networkx's Graph which simulated diffusion has been completed. 
+            time_step is total time the diffusion cost.
             final_R_receiver,final_T_receiver and  R_t_receiver are dict.
         '''
         if not is_apply:
@@ -124,6 +125,7 @@ class model_V2:
                             if flag == 1:
                                 final_R_receiver[node]='R'
                                 G.nodes[node]['status'] = 'R-active'
+                                G.nodes[node]['active_time'] = time_step # Record the activation time
                                 R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
                             elif flag == 2:
                                 final_T_receiver[node]='T'
@@ -134,7 +136,7 @@ class model_V2:
             time_step+=1
 
 
-        return G , final_R_receiver , final_T_receiver , R_t_receiver
+        return G , time_step ,final_R_receiver , final_T_receiver , R_t_receiver
 
     def __check_i_threshold(self,node,G:nx.Graph):
         influenced_num = 0
