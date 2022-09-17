@@ -21,3 +21,6 @@ self.G 的属性就会改变, 偏离 minGreedy 的原意, 需要改变逻辑.
 
 ### 2022.9.12
 > LTD1DT 改进成 model_V2. 自我感觉逻辑畅通多了，核心扩散功能基本正常；MinGreedy算法初步测试成功。<mark>想法：谣言遏制与真相最大化？让更多的inactive节点成为真相节点。<mark>
+
+### 2022.9.17
+> Pagerank 已经实现。假如后期效果不好，改用Networkx自带的PageRank。再不行就上pytorch。

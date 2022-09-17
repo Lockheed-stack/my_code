@@ -1,5 +1,4 @@
 #%%
-from typing import Callable
 import networkx as nx
 import numpy as np
 import LTD1DT
@@ -54,7 +53,7 @@ class unconstrained_algorithm:
 
         return seed_T
 
-    def pagerank(self,G:nx.Graph,alpha:float=0.85):
+    def pagerank(self,G:nx.Graph,alpha:float=0.85,theta:float=1e-6,iter_num:int=100):
         '''Calculating the Pagerank value of G
 
         Parameters
@@ -63,8 +62,48 @@ class unconstrained_algorithm:
             A Networkx Graph
         alpha: float, optional
             Damping parameter for PageRank, default=0.85.
+        theta: float, optional
+            The threshold of the pagerank value that coveraged to a rational value.
+            Default = 1e-6
+        iter_num: int, optional
+            Specifying a max iteration times. Default is None.
+
+        Returns
+        ---------
+        p: np.array
+            Nodes pagerank value
+
+        Note
+        ---------------
+        The iteration will stop after an error tolerance of len(G) * theta has been reached. 
+        If the number of iterations exceed max_iter, 
+        a PowerIterationFailedConvergence exception is raised.
         '''
-        trans_mat = nx.adjacency_matrix(G,dtype=float).toarray()
+        # it's an adjacency matrix now
+        node_list = [i for i in range(1,nx.number_of_nodes(G)+1)]
+        trans_mat = nx.adjacency_matrix(G,nodelist=node_list,dtype=np.float64).toarray()
+        n = nx.number_of_nodes(G)
+
+        # switch to transition probability matrix
+        for i in range(n):
+            trans_mat[:,i] = trans_mat[:,i]/np.dot(np.ones((1,n)),trans_mat[:,i])
+
+        # pagerank vector(column)
+        p = np.ones((n,1),)/n
+
+        for _ in range(iter_num):
+            p_last = p.copy()
+            p = (alpha*(np.dot(trans_mat,p))) + ((alpha/n)*np.ones((n,1)))
+
+            # check coveragence, L1 norm
+            err = np.absolute(p-p_last).sum()
+
+            if err < (n*theta):
+                return p
+        raise nx.PowerIterationFailedConvergence(iter_num)
+
+    def ContrId(self,):
+        pass
 
 # %%
 
@@ -83,7 +122,8 @@ nx.get_node_attributes(G2,'d_threshold')
 # %%
 result = model.diffusion()
 #%%
-a = nx.adjacency_matrix(G,[i for i in range(0,9)]).toarray()
+un_al = unconstrained_algorithm()
+un_al.pagerank(G,)
 # %%
-a
+nx.pagerank(G)
 # %%
