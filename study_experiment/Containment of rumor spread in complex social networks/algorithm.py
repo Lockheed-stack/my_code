@@ -53,25 +53,31 @@ class unconstrained_algorithm:
 
         return seed_T
 
-    def pagerank(self,G:nx.Graph,alpha:float=0.85,theta:float=1e-6,iter_num:int=100):
+    def pagerank(self,G:nx.Graph,k:int=1,alpha:float=0.85,theta:float=1e-6,iter_num:int=100):
         '''Calculating the Pagerank value of G
 
         Parameters
         ------------
         G: nx.Graph
             A Networkx Graph
+
+        k: int
+            Choose top k nodes as Truth seed.
+
         alpha: float, optional
             Damping parameter for PageRank, default=0.85.
+
         theta: float, optional
             The threshold of the pagerank value that coveraged to a rational value.
             Default = 1e-6
+
         iter_num: int, optional
             Specifying a max iteration times. Default is None.
 
         Returns
         ---------
-        p: np.array
-            Nodes pagerank value
+        seed_T: np.array
+            Top k pagerank value Nodes
 
         Note
         ---------------
@@ -90,6 +96,7 @@ class unconstrained_algorithm:
 
         # pagerank vector(column)
         p = np.ones((n,1),)/n
+        seed_T = {}
 
         for _ in range(iter_num):
             p_last = p.copy()
@@ -99,10 +106,26 @@ class unconstrained_algorithm:
             err = np.absolute(p-p_last).sum()
 
             if err < (n*theta):
-                return p
+                # choose top k nodes
+                if len(p)<=k:
+                    return [node for node in nx.nodes(G)]
+                else:
+                    reshape_p = np.reshape(p,np.shape(p)[0])
+                    while(k):
+                        max_pValue = 0
+                        chosen_node = 0
+                        for i in range(np.shape(reshape_p)[0]):
+                            if reshape_p[i]>max_pValue:
+                                if (i+1) not in seed_T:
+                                    max_pValue = reshape_p[i]
+                                    chosen_node=i+1
+                        seed_T[chosen_node]=max_pValue
+                        k-=1
+                    return seed_T
+                        
         raise nx.PowerIterationFailedConvergence(iter_num)
 
-    def ContrId(self,k:int=1,model:LTD1DT.model_V2=None):
+    def ContrId(self,model:LTD1DT.model_V2=None,k:int=1):
         '''Contributors Identification
 
         Parameters:
@@ -132,44 +155,30 @@ class unconstrained_algorithm:
         node_ctr = {}
         for node in nx.get_node_attributes(res[0],'active_time').items():
             ctr = 0 # contribution
-            for nbr in nx.neighbors(res[0]):
+            for nbr in nx.neighbors(res[0],node[0]):
                 if nbr in nx.get_node_attributes(res[0],'active_time'):
-                    ctr+=1
-            node_ctr[node]=ctr
+                    if res[0].nodes[nbr]['active_time']> node[1]:
+                        ctr+=1
+            node_ctr[node[0]]=ctr
 
         if k>len(node_ctr):
-            print(f'cannot find k truth nodes, only {len(node_ctr)} nodes found.')
+            print(f'cannot find {k} truth nodes, only {len(node_ctr)} nodes found.')
             return node_ctr    
         else:
             while(k):
                 max_ctr = 0
+                chosen_node = None
                 for node in node_ctr.items():
                     if node[1]>max_ctr:
                         chosen_node = node[0]
                         max_ctr = node[1]
-                seed_T[chosen_node] = max_ctr
-                node_ctr.pop(chosen_node)
-                k-=1
+                if chosen_node is None:
+                    print(f'cannot find another {k} more truth nodes, only {len(seed_T)} nodes found.')
+                    return seed_T
+                else:
+                    seed_T[chosen_node] = max_ctr
+                    node_ctr.pop(chosen_node)
+                    k-=1
         
         return seed_T
-
-# %%
-
-'''------------------ test below -----------------------'''
-G = nx.Graph()
-G.add_edges_from([(1,2),(1,7),(2,3),(3,4),(3,5),(4,6),(7,6),(7,8),(8,9),(9,5)])
-nx.draw_networkx(G,pos=nx.circular_layout(G),with_labels=True,font_color='white')
-#%%
-model = LTD1DT.model_V2(G,False,[],[6,8])
-G2 = model.get_initialized_G()
-nx.get_node_attributes(G2,'status')
-# %%
-nx.get_node_attributes(G2,'i_threshold')
-#%%
-nx.get_node_attributes(G2,'d_threshold')
-# %%
-result = model.diffusion()
-#%%
-un_al = unconstrained_algorithm()
-un_al.pagerank(G,)
 # %%

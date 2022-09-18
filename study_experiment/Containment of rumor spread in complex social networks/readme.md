@@ -25,3 +25,7 @@ self.G 的属性就会改变, 偏离 minGreedy 的原意, 需要改变逻辑.
 ### 2022.9.17
 > Pagerank 已经实现。假如后期效果不好，改用Networkx自带的PageRank。再不行就上pytorch。\
 > ContrId也写完了，但还没测试。
+
+### 2022.9.18
+> 都测试过了，基本没问题。准备进行比较实验。\
+> Proximately 版本的算法还没写。

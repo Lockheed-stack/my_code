@@ -100,10 +100,11 @@ class model_V2:
         # nothing_change = False
         R_num = -1
         T_num = -1
-        time_step = 1
+        time_step = 0
 
         while(R_num-len(final_R_receiver) or T_num-len(final_T_receiver)):
             
+            time_step+=1
 
             # nothing_change = True
             R_num = len(final_R_receiver)
@@ -123,17 +124,17 @@ class model_V2:
                         if flag != 0:
                             # nothing_change = False
                             if flag == 1:
-                                final_R_receiver[node]='R'
-                                G.nodes[node]['status'] = 'R-active'
-                                G.nodes[node]['active_time'] = time_step # Record the activation time
-                                R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
+                                if node not in final_R_receiver:
+                                    final_R_receiver[node]='R'
+                                    G.nodes[node]['status'] = 'R-active'
+                                    G.nodes[node]['active_time'] = time_step # Record the activation time
+                                    R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
                             elif flag == 2:
                                 final_T_receiver[node]='T'
                                 G.nodes[node]['status']='T-active'
                                 if node in  final_R_receiver:
                                     final_R_receiver.pop(node)
-            
-            time_step+=1
+                                    R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
 
 
         return G , time_step ,final_R_receiver , final_T_receiver , R_t_receiver
