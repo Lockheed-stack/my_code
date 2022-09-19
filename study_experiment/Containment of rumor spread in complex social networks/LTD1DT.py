@@ -1,9 +1,12 @@
 #%%
 import networkx as nx
 import numpy as np
+
+
 # %%
 class model_V2:
-    def __init__(self,G:nx.Graph,is_init:bool=False,seed_T:list=None,seed_R:list=None) -> None:
+
+    def __init__(self, G: nx.Graph, is_init: bool = False, seed_T: list = None, seed_R: list = None) -> None:
         '''Creating a LTD1TD model that running on G
 
         Parameters
@@ -22,7 +25,7 @@ class model_V2:
         If is_init is True and seedT or seedR is given(not None), the G's original attribuitions
         may be overrided.
         '''
-        
+
         self.G = nx.Graph(G)
         self.final_R_receiver = {}
         self.final_T_receiver = {}
@@ -39,38 +42,37 @@ class model_V2:
         # init Graph's threshold & status
         if not is_init:
             for node in nx.nodes(G):
-                self.G.nodes[node]['i_threshold']=np.random.uniform()
-                self.G.nodes[node]['d_threshold']=np.random.uniform()
-                self.G.nodes[node]['status']='inactive'
+                self.G.nodes[node]['i_threshold'] = np.random.uniform()
+                self.G.nodes[node]['d_threshold'] = np.random.uniform()
+                self.G.nodes[node]['status'] = 'inactive'
             # init R-seed nodes
-            if len(seed_R) !=0:
+            if len(seed_R) != 0:
                 for node in seed_R:
-                    self.G.nodes[node]['status']='R-active'
-                    self.final_R_receiver[node]='R'
+                    self.G.nodes[node]['status'] = 'R-active'
+                    self.final_R_receiver[node] = 'R'
             # init T-seed nodes
             if len(seed_T) != 0:
                 for node in seed_T:
-                    self.G.nodes[node]['status']='T-active'
-                    self.final_T_receiver[node]='T'
+                    self.G.nodes[node]['status'] = 'T-active'
+                    self.final_T_receiver[node] = 'T'
         else:
             for node in nx.nodes(G):
                 if G.nodes[node]['status'] == 'R-active':
-                    self.final_R_receiver[node]='R'
+                    self.final_R_receiver[node] = 'R'
                 elif G.nodes[node]['status'] == 'T-active':
                     self.final_T_receiver[node] = 'T'
             # init R-seed nodes
-            if len(seed_R) !=0:
+            if len(seed_R) != 0:
                 for node in seed_R:
-                    self.G.nodes[node]['status']='R-active'
-                    self.final_R_receiver[node]='R'
+                    self.G.nodes[node]['status'] = 'R-active'
+                    self.final_R_receiver[node] = 'R'
             # init T-seed nodes
             if len(seed_T) != 0:
                 for node in seed_T:
-                    self.G.nodes[node]['status']='T-active'
-                    self.final_T_receiver[node]='T'
+                    self.G.nodes[node]['status'] = 'T-active'
+                    self.final_T_receiver[node] = 'T'
 
-    
-    def diffusion(self,is_apply:bool=False,seed_T:list=None,seed_R:list=None):
+    def diffusion(self, is_apply: bool = False):
         '''Simulation test of diffusion
 
         Parameters
@@ -89,22 +91,22 @@ class model_V2:
             G = nx.Graph(self.G)
             final_T_receiver = self.final_T_receiver.copy()
             final_R_receiver = self.final_R_receiver.copy()
-            
+
         else:
             G = self.G
             final_R_receiver = self.final_R_receiver
             final_T_receiver = self.final_T_receiver
 
-        R_t_receiver = {0:[node for node in final_R_receiver.keys()]} # Nodes activated by rumor at time t
-        
+        R_t_receiver = {0: [node for node in final_R_receiver.keys()]}  # Nodes activated by rumor at time t
+
         # nothing_change = False
         R_num = -1
         T_num = -1
         time_step = 0
 
-        while(R_num-len(final_R_receiver) or T_num-len(final_T_receiver)):
-            
-            time_step+=1
+        while (R_num - len(final_R_receiver) or T_num - len(final_T_receiver)):
+
+            time_step += 1
 
             # nothing_change = True
             R_num = len(final_R_receiver)
@@ -112,7 +114,7 @@ class model_V2:
             # influence stage
             for node in nx.nodes(G):
                 if G.nodes[node]['status'] == 'inactive':
-                    if self.__check_i_threshold(node,G):
+                    if self.__check_i_threshold(node, G):
                         # nothing_change = False
                         pass
 
@@ -120,69 +122,68 @@ class model_V2:
             for node in nx.nodes(G):
                 if (G.nodes[node]['status'] == 'influenced') or (G.nodes[node]['status'] == 'R-active'):
                     if node not in self.seed_R:
-                        flag = self.__check_d_threshold(node,G)
+                        flag = self.__check_d_threshold(node, G)
                         if flag != 0:
                             # nothing_change = False
                             if flag == 1:
                                 if node not in final_R_receiver:
-                                    final_R_receiver[node]='R'
+                                    final_R_receiver[node] = 'R'
                                     G.nodes[node]['status'] = 'R-active'
-                                    G.nodes[node]['active_time'] = time_step # Record the activation time
-                                    R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
+                                    G.nodes[node]['active_time'] = time_step  # Record the activation time
+                                    R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
                             elif flag == 2:
-                                final_T_receiver[node]='T'
-                                G.nodes[node]['status']='T-active'
-                                if node in  final_R_receiver:
+                                final_T_receiver[node] = 'T'
+                                G.nodes[node]['status'] = 'T-active'
+                                if node in final_R_receiver:
                                     final_R_receiver.pop(node)
-                                    R_t_receiver[time_step]=[node for node in final_R_receiver.keys()]
+                                    R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
 
+        return G, time_step, final_R_receiver, final_T_receiver, R_t_receiver
 
-        return G , time_step ,final_R_receiver , final_T_receiver , R_t_receiver
-
-    def __check_i_threshold(self,node,G:nx.Graph):
+    def __check_i_threshold(self, node, G: nx.Graph):
         influenced_num = 0
-        node_deg = nx.degree(G,node)
+        node_deg = nx.degree(G, node)
         if node_deg == 0:
             return False
 
-        for nbr in nx.neighbors(G,node):
-            if (G.nodes[nbr]['status'] == 'R-active') or (G.nodes[nbr]['status'] == 'T-active') :
-                influenced_num+=1
-        
-        if (influenced_num/node_deg) >= G.nodes[node]['i_threshold']:
+        for nbr in nx.neighbors(G, node):
+            if (G.nodes[nbr]['status'] == 'R-active') or (G.nodes[nbr]['status'] == 'T-active'):
+                influenced_num += 1
+
+        if (influenced_num / node_deg) >= G.nodes[node]['i_threshold']:
             G.nodes[node]['status'] = 'influenced'
             return True
-        
+
         return False
-    
-    def __check_d_threshold(self,node,G:nx.Graph,):
+
+    def __check_d_threshold(self, node, G: nx.Graph):
         active_num = 0
         R_active_num = 0
         T_active_num = 0
 
         if (G.nodes[node]['status'] == 'T-active'):
             return 0
-        
-        for nbr in nx.neighbors(G,node):
+
+        for nbr in nx.neighbors(G, node):
             if G.nodes[nbr]['status'] == 'R-active':
-                active_num+=1
-                R_active_num+=1
+                active_num += 1
+                R_active_num += 1
             elif G.nodes[nbr]['status'] == 'T-active':
-                active_num+=1
-                T_active_num+=1
-        
+                active_num += 1
+                T_active_num += 1
+
         if active_num == 0:
             return 0
 
-        if (R_active_num/active_num) > G.nodes[node]['d_threshold']:
+        if (R_active_num / active_num) > G.nodes[node]['d_threshold']:
             return 1
 
-        elif T_active_num > 0 :
+        elif T_active_num > 0:
             return 2
-        
+
         return 0
 
-    def update_seed_T(self,seed_T:list,override:bool=False):
+    def update_seed_T(self, seed_T: list, override: bool = False):
         '''Updating the model's attribution associated with seed_T(include seed_T).
 
         Parameters
@@ -199,10 +200,9 @@ class model_V2:
         Only inactive node will be changed when override is False. If status of node is R-active or T-active, it will
         omit this update.
         '''
-        
-        
+
         if (seed_T is None):
-            return 
+            return
 
         if not override:
             self.seed_T += seed_T
@@ -210,17 +210,17 @@ class model_V2:
             for node in seed_T:
                 if self.G.nodes[node]['status'] == 'inactive':
                     self.G.nodes[node]['status'] = 'T-active'
-                    self.final_T_receiver[node]='T'
+                    self.final_T_receiver[node] = 'T'
         else:
             for node in self.seed_T:
                 self.G.nodes[node]['status'] = 'inactive'
                 self.final_T_receiver.pop(node)
             for node in seed_T:
                 self.G.nodes[node]['status'] = 'T-active'
-                self.final_T_receiver[node]='T'
+                self.final_T_receiver[node] = 'T'
             self.seed_T = seed_T.copy()
 
-    def update_seed_R(self,seed_R:list,override:bool=False):
+    def update_seed_R(self, seed_R: list, override: bool = False):
         '''Updating the model's attribution associated with seed_R(include seed_R).
 
         Parameters
@@ -237,10 +237,9 @@ class model_V2:
         Only inactive node will be changed when override is False. If status of node is R-active or T-active, it will
         omit this update.
         '''
-        
-        
+
         if (seed_R is None):
-            return 
+            return
 
         if not override:
             self.seed_R += seed_R
@@ -248,24 +247,24 @@ class model_V2:
             for node in seed_R:
                 if self.G.nodes[node]['status'] == 'inactive':
                     self.G.nodes[node]['status'] = 'R-active'
-                    self.final_R_receiver[node]='R'
+                    self.final_R_receiver[node] = 'R'
         else:
             for node in self.seed_R:
                 self.G.nodes[node]['status'] = 'inactive'
                 self.final_R_receiver.pop(node)
             for node in seed_R:
                 self.G.nodes[node]['status'] = 'R-active'
-                self.final_R_receiver[node]='R'
+                self.final_R_receiver[node] = 'R'
             self.seed_R = seed_R.copy()
-
-
 
     def get_initialized_G(self,):
         return nx.Graph(self.G)
 
     def copy(self,):
         G = nx.Graph(self.G)
-        return self.__class__(G,True,self.seed_T.copy(),self.seed_R.copy())
+        return self.__class__(G, True, self.seed_T.copy(), self.seed_R.copy())
+
+
 # %%
 
 # %%
