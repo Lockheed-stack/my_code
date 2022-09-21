@@ -2,8 +2,6 @@
 import networkx as nx
 import numpy as np
 import LTD1DT
-
-
 # %%
 class unconstrained_algorithm:
 
@@ -13,7 +11,26 @@ class unconstrained_algorithm:
         pass
 
     def MinGreedy(self, model: LTD1DT.model_V2, k: int = 1, seed_R: list = None):
+        '''Using greedy algorithm to find truth nodes
 
+        Parameters
+        ----------
+        model : LTD1DT.model_V2
+            A LTD1DT model
+        k : int, optional
+            To decide how many truth nodes will be chosen, by default 1
+        seed_R : list, optional
+            A list of rumor nodes, by default None
+
+        Returns
+        -------
+        seed_T : list
+            A list of truth nodes.
+        
+        Note
+        ----
+        This function will try to meet the requirement of choosing k truth nodes.
+        '''
         seed_T = []
         if seed_R is None:
             print('seed R has not  given.')
@@ -31,6 +48,7 @@ class unconstrained_algorithm:
         while (len(seed_T) < k):
 
             chosen_node = None
+            alternative_node = None
             temp_model = test_model.copy()
 
             for node in nx.nodes(G):
@@ -41,13 +59,18 @@ class unconstrained_algorithm:
                         chosen_node = node
                         final_R_num = len(result[2])
 
+                    elif final_R_num == len(result[2]):
+                        alternative_node = node
+
                 temp_model.update_seed_T(seed_T, True)
 
-            if chosen_node is None:
+            if (chosen_node is not None):
+                seed_T.append(chosen_node)
+            elif (alternative_node is not None):
+                seed_T.append(alternative_node)
+            else:
                 print(f'Cannot find {k} T nodes, only {len(seed_T)} found.')
                 return seed_T
-            else:
-                seed_T.append(chosen_node)
                 # temp_model.update_seed_T(seed_T)
 
         return seed_T
@@ -173,17 +196,26 @@ class unconstrained_algorithm:
             while (k):
                 max_ctr = 0
                 chosen_node = None
+                alternative_node = None
+
                 for node in node_ctr.items():
                     if node[1] > max_ctr:
                         chosen_node = node[0]
                         max_ctr = node[1]
-                if chosen_node is None:
-                    print(f'cannot find another {k} more truth nodes, only {len(seed_T)} nodes found.')
-                    return seed_T
-                else:
+                    elif node[1] == max_ctr:
+                        alternative_node = node[0]
+
+                if chosen_node is not None:
                     seed_T[chosen_node] = max_ctr
                     node_ctr.pop(chosen_node)
                     k -= 1
+                elif alternative_node is not None:
+                    seed_T[alternative_node] = max_ctr
+                    node_ctr.pop(alternative_node)
+                    k -= 1
+                else:
+                    print(f'cannot find another {k} more truth nodes, only {len(seed_T)} nodes found.')
+                    return seed_T
 
         return seed_T
 
