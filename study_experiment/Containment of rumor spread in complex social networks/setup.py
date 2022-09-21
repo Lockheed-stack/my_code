@@ -1,22 +1,23 @@
 #%%
-import algorithm 
-import LTD1DT
+from algorithm import unconstrained_algorithm as un_al
+from LTD1DT import model_V2
 import networkx as nx
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 # %%
 G_scale_free  = nx.barabasi_albert_graph(500,1)
 G_small_world = nx.watts_strogatz_graph(500,4,0.2,)
 G_netscience = nx.read_adjlist('./trimed_netScience.csv',nodetype=int,delimiter=',')
 G_uspower = nx.read_adjlist('./USpowerGrid.mtx',nodetype = int,)
 # %%
-model_sf = LTD1DT.model_V2(G_scale_free,False,[],[])
-model_sw = LTD1DT.model_V2(G_small_world,False,[],[])
-model_netsci = LTD1DT.model_V2(G_netscience,False,[],[])
-model_us = LTD1DT.model_V2(G_uspower,False,[],[])
+model_sf = model_V2(G_scale_free,False,[],[])
+model_sw = model_V2(G_small_world,False,[],[])
+model_netsci = model_V2(G_netscience,False,[],[])
+model_us = model_V2(G_uspower,False,[],[])
 # %%
-def calc_avg_R_diffu_num(model:LTD1DT.model_V2,run_times:int=100,seed_R_num:int=3,seed_T:list=[],rand_choose_R:bool=True):
+def calc_avg_R_diffu_num(model:model_V2,run_times:int=100,seed_R_num:int=3,seed_T:list=[],rand_choose_R:bool=True):
    
     diffu_result_num = []
     
@@ -31,7 +32,7 @@ def calc_avg_R_diffu_num(model:LTD1DT.model_V2,run_times:int=100,seed_R_num:int=
                 # test_model = model.copy()
                 # test_model.update_seed_R(seed_R,True)
                 # test_model.update_seed_T(seed_T,True)
-                test_model = LTD1DT.model_V2(model.G,False,seed_T,seed_R)
+                test_model = model_V2(model.G,False,seed_T,seed_R)
                 res = test_model.diffusion()
 
                 diffu_result_num.append(len(res[2]))
@@ -53,7 +54,7 @@ def calc_avg_R_diffu_num(model:LTD1DT.model_V2,run_times:int=100,seed_R_num:int=
             for i in range(run_times):
                 # generate seed R
 
-                test_model = LTD1DT.model_V2(model.G,False,seed_T,seed_R)
+                test_model = model_V2(model.G,False,seed_T,seed_R)
                 #test_model.update_seed_R(seed_R,True)
                 #test_model.update_seed_T(seed_T,True)
                 
@@ -63,13 +64,16 @@ def calc_avg_R_diffu_num(model:LTD1DT.model_V2,run_times:int=100,seed_R_num:int=
                 qbar.update(1)
 
     return np.average(diffu_result_num)
+
+# %%
+def algorithm_cmp(model:model_V2,):
+    
+    
+    for i in range(1,11):
+        Greedy_seed_T = un_al.MinGreedy(model,)
+
 #%%
-calc_avg_R_diffu_num(model_netsci,100,3,[],False)
-# %%
-list(nx.degree(G_netscience))
-# %%
-max(nx.degree(G_scale_free),key=lambda x:x[1])
-# %%
+'''--------- unfinished ------------'''
 def choose_top_k(k:int,node_deg_list:list):
     '''choose top k nodes with highest degree
 
@@ -98,11 +102,6 @@ def choose_top_k(k:int,node_deg_list:list):
 def partition(node_deg_list:list,left:int,right:int):
     pass
 #%%
-model_sf.update_seed_R([1,0,27],True)
-res = model_sf.diffusion()
-res[2]
-# %%
-len(res[2])
-# %%
-sorted(list(nx.degree(G_scale_free)),key=lambda x:x[1],reverse=True)
+'''---------- Run below -------------'''
+
 # %%
