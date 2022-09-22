@@ -214,7 +214,8 @@ class model_V2:
         else:
             for node in self.seed_T:
                 self.G.nodes[node]['status'] = 'inactive'
-                self.final_T_receiver.pop(node)
+                if node in self.final_T_receiver:
+                    self.final_T_receiver.pop(node)
             for node in seed_T:
                 self.G.nodes[node]['status'] = 'T-active'
                 self.final_T_receiver[node] = 'T'
@@ -251,7 +252,8 @@ class model_V2:
         else:
             for node in self.seed_R:
                 self.G.nodes[node]['status'] = 'inactive'
-                self.final_R_receiver.pop(node)
+                if node in self.final_R_receiver:
+                    self.final_R_receiver.pop(node)
             for node in seed_R:
                 self.G.nodes[node]['status'] = 'R-active'
                 self.final_R_receiver[node] = 'R'
