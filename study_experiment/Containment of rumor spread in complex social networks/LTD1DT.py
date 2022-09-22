@@ -1,4 +1,5 @@
 #%%
+from re import search
 import networkx as nx
 import numpy as np
 
@@ -99,44 +100,54 @@ class model_V2:
 
         R_t_receiver = {0: [node for node in final_R_receiver.keys()]}  # Nodes activated by rumor at time t
 
-        # nothing_change = False
-        R_num = -1
-        T_num = -1
+        nothing_change = False
+        # R_num = -1
+        # T_num = -1
         time_step = 0
-
-        while (R_num - len(final_R_receiver) or T_num - len(final_T_receiver)):
-
+        search_range = {} # to decrease the search range
+        # while (R_num - len(final_R_receiver) or T_num - len(final_T_receiver)):
+        while not nothing_change:
             time_step += 1
 
-            # nothing_change = True
-            R_num = len(final_R_receiver)
-            T_num = len(final_T_receiver)
+            nothing_change = True
+            # R_num = len(final_R_receiver)
+            # T_num = len(final_T_receiver)
             # influence stage
             for node in nx.nodes(G):
                 if G.nodes[node]['status'] == 'inactive':
                     if self.__check_i_threshold(node, G):
                         # nothing_change = False
-                        pass
+                        search_range[node]=1
 
             # decision stage
-            for node in nx.nodes(G):
+            # for node in nx.nodes(G):
+            for node in list(search_range.keys()):
                 if (G.nodes[node]['status'] == 'influenced') or (G.nodes[node]['status'] == 'R-active'):
                     if node not in self.seed_R:
                         flag = self.__check_d_threshold(node, G)
                         if flag != 0:
-                            # nothing_change = False
-                            if flag == 1:
+                            
+                            if flag == 1:# decide to be R
                                 if node not in final_R_receiver:
                                     final_R_receiver[node] = 'R'
                                     G.nodes[node]['status'] = 'R-active'
                                     G.nodes[node]['active_time'] = time_step  # Record the activation time
-                                    R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
-                            elif flag == 2:
+                                    #R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
+                                    R_t_receiver[time_step] = list(final_R_receiver.keys())
+                                    
+                                    nothing_change = False
+                            
+                            elif flag == 2:# decide to be T
                                 final_T_receiver[node] = 'T'
                                 G.nodes[node]['status'] = 'T-active'
                                 if node in final_R_receiver:
                                     final_R_receiver.pop(node)
-                                    R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
+                                    # R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
+                                    R_t_receiver[time_step] = list(final_R_receiver.keys())
+                                    
+                                    search_range.pop(node)
+
+                                    nothing_change = False
 
         return G, time_step, final_R_receiver, final_T_receiver, R_t_receiver
 
@@ -159,9 +170,9 @@ class model_V2:
     def __check_d_threshold(self, node, G: nx.Graph):
         active_num = 0
         R_active_num = 0
-        T_active_num = 0
+        # T_active_num = 0
 
-        if (G.nodes[node]['status'] == 'T-active'):
+        if (G.nodes[node]['status'] == 'T-active'):# T-active node cannot change to be R
             return 0
 
         for nbr in nx.neighbors(G, node):
@@ -170,18 +181,21 @@ class model_V2:
                 R_active_num += 1
             elif G.nodes[nbr]['status'] == 'T-active':
                 active_num += 1
-                T_active_num += 1
+                # T_active_num += 1
 
         if active_num == 0:
             return 0
 
-        if (R_active_num / active_num) > G.nodes[node]['d_threshold']:
+        # decide to be R
+        elif (R_active_num / active_num) > G.nodes[node]['d_threshold']:
             return 1
-
-        elif T_active_num > 0:
+        # decide to be T
+        else:
             return 2
+        # elif T_active_num > 0:
+        #     return 2
 
-        return 0
+        # return 0
 
     def update_seed_T(self, seed_T: list, override: bool = False):
         '''Updating the model's attribution associated with seed_T(include seed_T).

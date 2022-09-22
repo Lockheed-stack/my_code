@@ -1,6 +1,6 @@
 #%%
-from pdb import line_prefix
-from algorithm import unconstrained_algorithm as un_al
+from typing import Callable
+import algorithm as algor
 from LTD1DT import model_V2
 import networkx as nx
 import numpy as np
@@ -146,35 +146,44 @@ def calc_avg_R_diffu_num(G:nx.Graph,run_times:int=100,seed_R_num:int=3,rand_choo
 
 
 #%%
-'''--------- unfinished ------------'''
-def choose_top_k(k:int,node_deg_list:list):
-    '''choose top k nodes with highest degree
+'''unfinish'''
+def avg_R_diffu_num(G:nx.Graph,run_times:int=100,seed_R_num:int=3,rand_choose_R:bool=True,func:Callable=None,fargs:tuple=()):
 
-    parameters:
-    -------------
-    k: int
-        choose k nodes
-    node_deg_list: list
-        A list of elements with tuples. tuple:(node,degee)
+    if func is None:
+        print('please specify a algorithm function')
+        return []
     
-    return:
-    -------------
-    node_list: list
-        top k nodes of list.
-    '''
-    left = 0
-    right = len(node_deg_list)-1
-    target = len(node_deg_list)-k
+    if rand_choose_R:
+        df_node = pd.DataFrame(G.nodes())
 
-    while(True):
-        pivot = partition(node_deg_list,left,right)
+        for k in range(0,11):# select k(from 0 to 10) nodes of Truth
+            print(f'choose {k} Truth nodes...')
+            with tqdm(total = run_times) as qbar:
+                for i in range(run_times):
+                    # generate seed R
+                    rand_seed_R = df_node.sample(seed_R_num,replace=False).to_numpy(dtype=int)
+                    seed_R = np.reshape(rand_seed_R,rand_seed_R.shape[0])
+                    
+                    seed_T = func(G,seed_R,*fargs)
 
-        if pivot == target:
-            return 
 
-def partition(node_deg_list:list,left:int,right:int):
-    pass
 #%%
 '''---------- Run below -------------'''
 calc_avg_R_diffu_num(G_scale_free,100,3,)
+# %%
+list(nx.neighbors(G_scale_free,123))
+# %%
+al = un_al()
+al.MinGreedy(model_sf,10,[0,14,6])
+# %%
+al.ContrId(model_sf,10,[0,14,6])
+# %%
+sorted(dict(nx.degree(G_scale_free,)).items(),key=lambda x:x[1],reverse=True)
+# %%
+model_sf.update_seed_R([0,14,6])
+#%%
+model_sf.update_seed_T([],True)
+len(model_sf.diffusion()[2])
+# %%
+
 # %%
