@@ -4,13 +4,13 @@ import numpy as np
 import LTD1DT
 # %%
 
-def MinGreedy(G: nx.Graph, seed_R: list = None, k: int = 1):
+def MinGreedy(model:LTD1DT.model_V2, seed_R: list = None, k: int = 1):
     '''Using greedy algorithm to find k truth nodes.
 
     Parameters
     ----------
-    G : nx.Graph
-        A Networkx Graph.
+    model : LTD1DT.model_v2
+        A LTD1DT model
     seed_R : list, optional
         A list of rumor nodes, by default None
     k : int, optional
@@ -29,8 +29,9 @@ def MinGreedy(G: nx.Graph, seed_R: list = None, k: int = 1):
         # print('invaild k.')
         return seed_T
 
-    test_model = LTD1DT.model_V2(G,False,[],seed_R)
-    # test_model.update_seed_R(seed_R, True)
+    # test_model = LTD1DT.model_V2(G,False,[],seed_R)
+    test_model = model.copy()
+    test_model.update_seed_R(seed_R, True)
 
     G, time_step, final_R, final_T, R_t_receiver = test_model.diffusion()
     final_R_num = len(final_R)
@@ -63,7 +64,7 @@ def MinGreedy(G: nx.Graph, seed_R: list = None, k: int = 1):
 
     return seed_T
 
-def pagerank(G: nx.Graph, k: int = 1, alpha: float = 0.85, theta: float = 1e-6, iter_num: int = 100):
+def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, theta: float = 1e-6, iter_num: int = 100):
     '''Calculating the Pagerank value of G
 
     Parameters
@@ -130,7 +131,7 @@ def pagerank(G: nx.Graph, k: int = 1, alpha: float = 0.85, theta: float = 1e-6, 
                     chosen_node = 0
                     for i in range(np.shape(reshape_p)[0]):
                         if reshape_p[i] > max_pValue:
-                            if (node_list[i]) not in seed_T:
+                            if ((node_list[i]) not in seed_T) and ((node_list[i]) not in seed_R):
                                 max_pValue = reshape_p[i]
                                 chosen_node = node_list[i]
                     seed_T[chosen_node] = max_pValue
@@ -140,7 +141,7 @@ def pagerank(G: nx.Graph, k: int = 1, alpha: float = 0.85, theta: float = 1e-6, 
 
     raise nx.PowerIterationFailedConvergence(iter_num)
 
-def ContrId(G: nx.Graph, seed_R: list = None, k: int = 1):
+def ContrId(model: LTD1DT.model_V2, seed_R: list = None, k: int = 1):
     '''Contributors Identification
 
     Parameters:
@@ -164,19 +165,19 @@ def ContrId(G: nx.Graph, seed_R: list = None, k: int = 1):
 
     if k <= 0:
         return []
-    if G is None:
-        print('a Networkx Graph need to be given.')
-        return
+    # if G is None:
+    #     print('a Networkx Graph need to be given.')
+    #     return
     if seed_R is None:
         print('please give a seed_R')
         return
     else:
-        # temp_model = model.copy()
-        # temp_model.update_seed_T([], override=True)
-        # temp_model.update_seed_R(seed_R, override=True)
-        # res = temp_model.diffusion()
-        temp_model = LTD1DT.model_V2(G,False,[],seed_R)
+        temp_model = model.copy()
+        temp_model.update_seed_T([], override=True)
+        temp_model.update_seed_R(seed_R, override=True)
         res = temp_model.diffusion()
+        # temp_model = LTD1DT.model_V2(G,False,[],seed_R)
+        # res = temp_model.diffusion()
 
     seed_T = {} # As return value
     node_ctr = {}

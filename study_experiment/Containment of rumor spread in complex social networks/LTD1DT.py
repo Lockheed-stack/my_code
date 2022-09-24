@@ -1,9 +1,6 @@
 #%%
-from re import search
 import networkx as nx
 import numpy as np
-
-
 # %%
 class model_V2:
 
@@ -104,7 +101,17 @@ class model_V2:
         # R_num = -1
         # T_num = -1
         time_step = 0
-        search_range = {} # to decrease the search range
+
+        # to decrease the search range
+        i_search_range = {}
+        d_search_range = {} # NOTE: It's init as '{}' because the initial R will not change to T.
+        
+        # Looking for potential node at active node surrounding
+        for node in (list(final_R_receiver.keys())+list(final_T_receiver.keys())):
+            for nbr in nx.neighbors(G,node):
+                if G.nodes[nbr]['status'] == 'inactive':
+                    i_search_range[nbr] = 1
+
         # while (R_num - len(final_R_receiver) or T_num - len(final_T_receiver)):
         while not nothing_change:
             time_step += 1
@@ -112,16 +119,20 @@ class model_V2:
             nothing_change = True
             # R_num = len(final_R_receiver)
             # T_num = len(final_T_receiver)
+
             # influence stage
-            for node in nx.nodes(G):
-                if G.nodes[node]['status'] == 'inactive':
-                    if self.__check_i_threshold(node, G):
-                        # nothing_change = False
-                        search_range[node]=1
+            for node in i_search_range.keys():
+                if self.__check_i_threshold(node,G):
+                    d_search_range[node] = 1
+            # for node in nx.nodes(G):
+            #     if G.nodes[node]['status'] == 'inactive':
+            #         if self.__check_i_threshold(node, G):
+            #             # nothing_change = False
+            #             d_search_range[node]=1
 
             # decision stage
             # for node in nx.nodes(G):
-            for node in list(search_range.keys()):
+            for node in list(d_search_range.keys()):
                 if (G.nodes[node]['status'] == 'influenced') or (G.nodes[node]['status'] == 'R-active'):
                     if node not in self.seed_R:
                         flag = self.__check_d_threshold(node, G)
@@ -134,7 +145,7 @@ class model_V2:
                                     G.nodes[node]['active_time'] = time_step  # Record the activation time
                                     #R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
                                     R_t_receiver[time_step] = list(final_R_receiver.keys())
-                                    
+
                                     nothing_change = False
                             
                             elif flag == 2:# decide to be T
@@ -145,9 +156,15 @@ class model_V2:
                                     # R_t_receiver[time_step] = [node for node in final_R_receiver.keys()]
                                     R_t_receiver[time_step] = list(final_R_receiver.keys())
                                     
-                                    search_range.pop(node)
+                                    d_search_range.pop(node)
 
                                     nothing_change = False
+                            
+                            if node in i_search_range:
+                                i_search_range.pop(node)
+                                for nbr in nx.neighbors(G,node):
+                                    if G.nodes[nbr]['status'] == 'inactive':
+                                        i_search_range[nbr]=1
 
         return G, time_step, final_R_receiver, final_T_receiver, R_t_receiver
 
@@ -280,7 +297,5 @@ class model_V2:
         G = nx.Graph(self.G)
         return self.__class__(G, True, self.seed_T.copy(), self.seed_R.copy())
 
-
-# %%
 
 # %%

@@ -52,3 +52,47 @@ self.G 的属性就会改变, 偏离 minGreedy 的原意, 需要改变逻辑.
 ### 2022.9.22
 > 随机选取谣言节点, 并不会造成大规模的扩散,因此真相节点也选不出啥.所以贪心和启发式算法的结果差不多.\
 > 通过 line profiler 分析,贪心法99.7%的时间都用在 diffusion 上.看看能不能稍微优化一下.
+
+### 2022.9.24
+> 优化了 LTD1DT 模型，缩小了搜索范围，速度大约快了 3 倍。
+> 对比如下：选取度最大的点作为谣言节点。
+> 1. 原版：
+> ```python
+> [in]  model3= model_V0(G_scale_free,False,[],[1,2,4])
+>       %time len(model3.diffusion()[2])
+> [out] CPU times: user 20.6 ms, sys: 94 µs, total: 20.7 ms
+>       Wall time: 18.6 ms
+>       103
+> ```
+> 2. 新版（重新初始化）:
+> ```python
+> [in]  model4 = model_V2(G_scale_free,False,[],[1,2,4])
+>       %time len(model4.diffusion()[2])
+> [out] CPU times: user 5.75 ms, sys: 0 ns, total: 5.75 ms
+>       Wall time: 5.54 ms
+>       122
+> ```
+> 3. 新版（使用原版的初始化的图）:
+> ```python
+> [in]  model5 = model_V2(model3.G,True,[],[1,2,4])
+>       %time len(model5.diffusion()[2])
+> [out] CPU times: user 6.05 ms, sys: 1.16 ms, total: 7.21 ms
+>       Wall time: 6.69 ms
+>       103
+> ```
+> 然而对于MinGreedy，还是慢，只比原来快 50% 左右。算法速度的下限就那样了，加上python也是慢。
+>
+> 优化前：
+> ```python
+> [in]  %time algor.MinGreedy(model,[1,2,4],10)
+> [out] CPU times: user 47.4 s, sys: 46.7 ms, total: 47.5 s
+>       Wall time: 47.5 s
+>       [3, 29, 35, 109, 157, 169, 17, 37, 124, 187]
+> ```
+> 优化后：（使用优化前初始化的图）
+> ```python
+> [in]  %time algor.MinGreedy(model_sf,[1,2,4],10)
+> [out] CPU times: user 26.2 s, sys: 114 ms, total: 26.3 s
+>       Wall time: 26.3 s
+>       [3, 29, 35, 109, 157, 169, 17, 37, 124, 187]
+> ```
