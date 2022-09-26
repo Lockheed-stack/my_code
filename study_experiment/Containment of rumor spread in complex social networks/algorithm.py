@@ -64,7 +64,7 @@ def MinGreedy(model:LTD1DT.model_V2, seed_R: list = None, k: int = 1):
 
     return seed_T
 
-def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, theta: float = 1e-6, iter_num: int = 100):
+def pagerank(G: nx.Graph, seed_R:list=None,k: int = 0, alpha: float = 0.85, theta: float = 1e-6, iter_num: int = 100):
     '''Calculating the Pagerank value of G
 
     Parameters
@@ -73,10 +73,10 @@ def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, thet
         A Networkx Graph
 
     k: int
-        Choose top k nodes as Truth seed.
+        Choose top k nodes as Truth seed. If (k < 0) or (k > node num), it will return sorted and descend pagerank value.
 
     alpha: float, optional
-        Damping parameter for PageRank, default=0.85.
+        Damping parameter for PageRank, by default=0.85.
 
     theta: float, optional
         The threshold of the pagerank value that coveraged to a rational value.
@@ -97,7 +97,7 @@ def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, thet
     a PowerIterationFailedConvergence exception is raised.
     '''
 
-    if k <= 0:
+    if k == 0:
         return []
 
     # it's an adjacency matrix now
@@ -123,9 +123,17 @@ def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, thet
         err = np.absolute(p - p_last).sum()
 
         if err < (n * theta):
+            
             # choose top k nodes
-            if len(p) <= k:
-                return [node for node in nx.nodes(G)]
+            if (len(p) <= k) or (k<0):
+                # return [node for node in nx.nodes(G)]
+                node_pg_dict = {}
+                for i in range(nx.number_of_nodes(G)):
+                    if node_list[i] not in seed_R:
+                        node_pg_dict[node_list[i]] = p[i]
+                sorted_pg = sorted(node_pg_dict.items(),key=lambda x:x[1],reverse=True)
+                return list(dict(sorted_pg).keys())
+
             else:
                 reshape_p = np.reshape(p, np.shape(p)[0])
                 while (k):

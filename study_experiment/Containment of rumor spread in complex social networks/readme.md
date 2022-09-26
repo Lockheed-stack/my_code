@@ -137,3 +137,11 @@ self.G 的属性就会改变, 偏离 minGreedy 的原意, 需要改变逻辑.
 > [out] [7, 2, 35, 61, 244, 6, 18, 25, 30, 56]
 >       4.612504005432129
 > ```
+### 2022.9.26
+> 当图节点数量增多后, PageRank的速度也逐渐慢下来.\
+> 但大头还是贪心法. 在 uspower 中,选一个点快 1 分钟.
+> ```python
+> [in] %time len(algor.MinGreedy(model_us,[2553,4458,831],1))
+> [out] CPU times: user 52 s, sys: 170 ms, total: 52.2 s
+>       Wall time: 52.2 s
+> ```

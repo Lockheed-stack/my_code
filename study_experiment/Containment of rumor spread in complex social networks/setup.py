@@ -107,16 +107,20 @@ def calc_avg_R_diffu_num(G:nx.Graph,func:Callable,fargs:tuple=(),run_times:int=1
 #%%
 def calc_avg_R_diffu_num_V2(G:nx.Graph,run_times:int=100,seed_R_num:int=3,random:bool=True):
 
-    greedy_res = []
-    pagerank_res = []
-    contrid_res = []
+    greedy_r = []
+    greedy_t = []
+    pagerank_r = []
+    pagerank_t = []
+    contrid_r = []
+    contrid_t = []
 
     if random:
         df_node = DataFrame(G.nodes())
-
+        pg = algor.pagerank(G,[],-1)
         for k in range(0,11):
             print(f'choose {k} Truth nodes...')
-            greedy_num,pg_num,contrid_num =0,0,0
+            greedy_num_r,pg_num_r,contrid_num_r =0,0,0
+            greedy_num_t,pg_num_t,contrid_num_t =0,0,0
 
             with tqdm(total=run_times) as qbar:
                 for i in range(run_times):
@@ -130,20 +134,31 @@ def calc_avg_R_diffu_num_V2(G:nx.Graph,run_times:int=100,seed_R_num:int=3,random
                     contrid_T = algor.ContrId(test_model,seed_R,k)
 
                     test_model.update_seed_T(greedy_T,True)
-                    greedy_num += len(test_model.diffusion()[2])
+                    res = test_model.diffusion()
+                    greedy_num_r += len(res[2])
+                    greedy_num_t += len(res[3])
 
                     test_model.update_seed_T(pg_T,True)
-                    pg_num += len(test_model.diffusion()[2])
+                    res = test_model.diffusion()
+                    pg_num_r += len(res[2])
+                    pg_num_t += len(res[3])
 
                     test_model.update_seed_T(contrid_T,True)
-                    contrid_num += len(test_model.diffusion()[2])
+                    res = test_model.diffusion()
+                    contrid_num_r += len(res[2])
+                    contrid_num_t += len(res[3])
 
                     qbar.update(1)
-            greedy_res.append(greedy_num/run_times)
-            pagerank_res.append(pg_num/run_times)
-            contrid_res.append(contrid_num/run_times)
+            greedy_r.append(greedy_num_r/run_times)
+            greedy_t.append(greedy_num_t/run_times)
 
-        return {'greedy':greedy_res,'pagerank':pagerank_res,'contrid':contrid_res}
+            pagerank_r.append(pg_num_r/run_times)
+            pagerank_t.append(pg_num_t/run_times)
+
+            contrid_r.append(contrid_num_r/run_times)
+            contrid_t.append(contrid_t/run_times)
+
+        return {'greedy':[greedy_r,greedy_t],'pagerank':[pagerank_r,pagerank_t],'contrid':[contrid_r,contrid_t]}
     
     
     else:
@@ -152,11 +167,13 @@ def calc_avg_R_diffu_num_V2(G:nx.Graph,run_times:int=100,seed_R_num:int=3,random
         for i in range(seed_R_num):
             seed_R.append(sorted_node_deg[i][0])
 
+        pg = algor.pagerank(G,seed_R,-1)
+
         for k in range(0,11):
             print(f'choose {k} Truth nodes...')
-            greedy_num,pg_num,contrid_num = 0,0,0
-
-            pg_T = algor.pagerank(G,seed_R,k)
+            greedy_num_r,pg_num_r,contrid_num_r = 0,0,0
+            greedy_num_t,pg_num_t,contrid_num_t =0,0,0
+            pg_T = pg[:k]
 
             with tqdm(total=run_times) as qbar:
                 for i in range(run_times):
@@ -167,20 +184,31 @@ def calc_avg_R_diffu_num_V2(G:nx.Graph,run_times:int=100,seed_R_num:int=3,random
                     contrid_T = algor.ContrId(test_model,seed_R,k)
 
                     test_model.update_seed_T(greedy_T,True)
-                    greedy_num += len(test_model.diffusion()[2])
+                    res = test_model.diffusion()
+                    greedy_num_r += len(res[2])
+                    greedy_num_t += len(res[3])
 
                     test_model.update_seed_T(pg_T,True)
-                    pg_num += len(test_model.diffusion()[2])
+                    res = test_model.diffusion()
+                    pg_num_r += len(res[2])
+                    pg_num_t += len(res[3])
 
                     test_model.update_seed_T(contrid_T,True)
-                    contrid_num += len(test_model.diffusion()[2])
+                    res = test_model.diffusion()
+                    contrid_num_r += len(res[2])
+                    contrid_num_t += len(res[3])
 
                     qbar.update(1)
-            greedy_res.append(greedy_num/run_times)
-            pagerank_res.append(pg_num/run_times)
-            contrid_res.append(contrid_num/run_times)
+            greedy_r.append(greedy_num_r/run_times)
+            greedy_t.append(greedy_num_t/run_times)
 
-        return {'greedy':greedy_res,'pagerank':pagerank_res,'contrid':contrid_res}
+            pagerank_r.append(pg_num_r/run_times)
+            pagerank_t.append(pg_num_t/run_times)
+
+            contrid_r.append(contrid_num_r/run_times)
+            contrid_t.append(contrid_t/run_times)
+
+        return {'greedy':[greedy_r,greedy_t],'pagerank':[pagerank_r,pagerank_t],'contrid':[contrid_r,contrid_t]}
 #%%
 # def run_pagerank(G:nx.Graph,choose_T_num:int=0,seed_R_num:int=3,random:bool=True,fargs:tuple=()):
 
@@ -234,8 +262,8 @@ if __name__ == "__main__":
     with open('res_nts.pkl','wb') as file:
         pickle.dump(res_nts,file)
     #%%
-    res_us = calc_avg_R_diffu_num_V2(G_uspower,random=False)
-    with open('res_us.pkl','wb') as file:
-        pickle.dump(res_us,file)
+    # res_us = calc_avg_R_diffu_num_V2(G_uspower,random=False)
+    # with open('res_us.pkl','wb') as file:
+    #     pickle.dump(res_us,file)
 
 # %%
