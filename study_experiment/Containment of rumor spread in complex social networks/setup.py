@@ -156,7 +156,7 @@ def calc_avg_R_diffu_num_V2(G:nx.Graph,run_times:int=100,seed_R_num:int=3,random
             pagerank_t.append(pg_num_t/run_times)
 
             contrid_r.append(contrid_num_r/run_times)
-            contrid_t.append(contrid_t/run_times)
+            contrid_t.append(contrid_num_t/run_times)
 
         return {'greedy':[greedy_r,greedy_t],'pagerank':[pagerank_r,pagerank_t],'contrid':[contrid_r,contrid_t]}
     
@@ -206,7 +206,7 @@ def calc_avg_R_diffu_num_V2(G:nx.Graph,run_times:int=100,seed_R_num:int=3,random
             pagerank_t.append(pg_num_t/run_times)
 
             contrid_r.append(contrid_num_r/run_times)
-            contrid_t.append(contrid_t/run_times)
+            contrid_t.append(contrid_num_t/run_times)
 
         return {'greedy':[greedy_r,greedy_t],'pagerank':[pagerank_r,pagerank_t],'contrid':[contrid_r,contrid_t]}
 #%%
