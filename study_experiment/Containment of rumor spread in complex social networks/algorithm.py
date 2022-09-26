@@ -102,7 +102,8 @@ def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, thet
 
     # it's an adjacency matrix now
     node_list = list(nx.nodes(G))
-    trans_mat = nx.adjacency_matrix(G, dtype=np.float64).toarray()
+    # trans_mat = nx.adjacency_matrix(G, dtype=np.float64).toarray()
+    trans_mat = nx.to_numpy_matrix(G,dtype=np.float64) # return numpy.matrix
     n = nx.number_of_nodes(G)
 
     # switch to transition probability matrix
@@ -111,6 +112,7 @@ def pagerank(G: nx.Graph, seed_R:list=None,k: int = 1, alpha: float = 0.85, thet
 
     # pagerank vector(column)
     p = np.ones((n, 1),) / n
+    trans_mat = trans_mat.A
     seed_T = {}
 
     for _ in range(iter_num):

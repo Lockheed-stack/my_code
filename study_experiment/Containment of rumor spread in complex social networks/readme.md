@@ -96,3 +96,44 @@ self.G 的属性就会改变, 偏离 minGreedy 的原意, 需要改变逻辑.
 >       Wall time: 26.3 s
 >       [3, 29, 35, 109, 157, 169, 17, 37, 124, 187]
 > ```
+
+### 2022.9.25
+> 换了一个python解释器：pypy。原版的解释器应该是cpython。\
+> 大部分情况是更快了，尤其循环多的情况。\
+> 在控制台上测试：
+> 1. 原版解释器：
+> ```python
+>   from LTD1DT import model_V2
+>   from algorithm import MinGreedy
+>   import networkx as nx
+>   import time
+>   G = nx.barabasi_albert_graph(500,1)
+>   model = model_V2(G,False,[],[23,1,0])
+>   def func():
+>       t = time.time()
+>       print(MinGreedy(model,[23,1,0],10))
+>       print(time.time()-t)
+> [in]  func()
+> [out] [7, 2, 35, 61, 244, 6, 18, 25, 30, 56]
+>       16.490251779556274
+> ```
+> 2. pypy解释器(重新初始化一个图)：
+> ```python
+>   def func():
+>       t = time.time()
+>       print(MinGreedy(model,[23,1,0],10))
+>       print(time.time()-t)
+> [in]  func()
+> [out] [59, 178, 42, 105, 8, 54, 121, 144, 192, 212]
+>       4.1216888427734375
+> ```
+> 3. pypy解释器(使用原始的图)：
+> ```python
+>   def func():
+>       t = time.time()
+>       print(MinGreedy(model,[23,1,0],10))
+>       print(time.time()-t)
+> [in]  func()
+> [out] [7, 2, 35, 61, 244, 6, 18, 25, 30, 56]
+>       4.612504005432129
+> ```

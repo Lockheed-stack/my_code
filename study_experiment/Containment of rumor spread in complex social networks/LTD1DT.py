@@ -299,3 +299,8 @@ class model_V2:
 
 
 # %%
+# G_scale_free  = nx.barabasi_albert_graph(500,1)
+# model = model_V2(G_scale_free,False,[],[23,1,0])
+# # %%
+# %time len(model.diffusion()[2])
+# %%
