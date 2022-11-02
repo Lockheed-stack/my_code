@@ -338,52 +338,6 @@ class model:
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 #%%
 # ------------- test -------------------
-if __name__ == '__main__':
-    model1 = model(nx.karate_club_graph(),)
-#%%
-    G = nx.Graph()
-    G.add_edges_from([(1, 2), (1, 3), (1, 5), (1, 7), (2, 4), (2, 6), (3, 4), (3, 8), (3, 5), (5, 9), (7, 10), (6, 8),
-                    (10, 9), (11, 1), (9, 1)])
-    nx.draw_networkx(G, with_labels=True,)
-    # %%
-    model1.G.degree
-    #%%
-    model1.authoritative_T
-    # %%
-    r_node = model1.generate_R_nodes(1, 3, [])
-    r_node
-    #%%
-    res = model1.before_detected_diffusion(
-        r_node,
-        [],
-    )
-    res
-    # %%
-    model1.after_detected_diffusion(*res)
-    #nx.get_node_attributes(model1.G, 'i_threshold')
-    # %%
-    model1.update_seed_R_status([3], G)
-    #%%
-    def test(a:list):
-        #a = a.copy()
-        a.append(1)
-    a = [234]
-    test(a)
-    a
-    # %%
-    if 1:
-        print(a)
-    # %%
-    nx.get_node_attributes(model1.G,'status')
-    # %%
-    node_c = []
-    for node in model1.G.nodes:
-        if node in {0: 1, 5: 1}:
-            node_c.append('g')
-        elif node in {1: 1,  33: 1,  2: 1,  11: 1,}:
-            node_c.append('r')
-        else:
-            node_c.append('gray')
-    nx.draw_networkx(model1.G, with_labels=True,node_color=node_c)
+
 # %%
 # %%
