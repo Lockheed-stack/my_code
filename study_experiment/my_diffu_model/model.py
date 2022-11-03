@@ -20,6 +20,7 @@ class model:
 
         self.G:nx.Graph = G.copy()
         self.droped_auT_df = pd.DataFrame()
+        self.df = pd.DataFrame(self.G.degree, columns=['node', 'degree'], dtype=int).set_index('node')
         self.stubborn_R = {}
 
         self.authoritative_T = self.select_authoritative_T_nodes(au_T_rate)
@@ -77,10 +78,10 @@ class model:
 
     def select_authoritative_T_nodes(self, T_percent: float):
 
-        df = pd.DataFrame(self.G.degree, columns=['node', 'degree'], dtype=int).set_index('node')
-        median_degree = df['degree'].median()
+        #df = pd.DataFrame(self.G.degree, columns=['node', 'degree'], dtype=int).set_index('node')
+        median_degree = self.df['degree'].median()
 
-        ge_median_nodes = df.query(f'degree>{median_degree}')
+        ge_median_nodes = self.df.query(f'degree>{median_degree}')
 
         if (ge_median_nodes.shape[0]*T_percent) < 1:
             T_sample_df = ge_median_nodes.sample(1, replace=False)
@@ -89,7 +90,7 @@ class model:
 
         T_nodes = list(T_sample_df.index)
         
-        self.droped_auT_df = df.drop(T_nodes,)
+        self.droped_auT_df = self.df.drop(T_nodes,)
         return T_nodes
 
     def __check_i_threshold(self, node, G: nx.Graph):
@@ -193,6 +194,7 @@ class model:
     def refresh_i_c_threshold(self,new_au_T:bool=False,au_T_rate:float=0.0):
         
         if new_au_T:
+            self.authoritative_T.clear()
             self.authoritative_T = self.select_authoritative_T_nodes(au_T_rate)
         
         for node in nx.nodes(self.G):
