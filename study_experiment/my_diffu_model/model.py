@@ -21,10 +21,10 @@ class model:
         self.G:nx.Graph = G.copy()
         self.droped_auT_df = pd.DataFrame()
         self.df = pd.DataFrame(self.G.degree, columns=['node', 'degree'], dtype=int).set_index('node')
-        self.stubborn_R = {}
+        self.stubborn_R = {} # the seed of rumor nodes
 
         self.authoritative_T = self.select_authoritative_T_nodes(au_T_rate)
-        
+        self.other_T = {} # the monitoring T nodes or other T nodes
         '''
         group:
             inactive:0
@@ -79,6 +79,10 @@ class model:
     def select_authoritative_T_nodes(self, T_percent: float):
 
         #df = pd.DataFrame(self.G.degree, columns=['node', 'degree'], dtype=int).set_index('node')
+        if T_percent == 0:
+            self.droped_auT_df = self.df.copy()
+            return []
+            
         median_degree = self.df['degree'].median()
 
         ge_median_nodes = self.df.query(f'degree>{median_degree}')
@@ -206,6 +210,9 @@ class model:
             self.G.nodes[node]['group'] = 2
             self.__new_correction_threshold(node,)
 
+    def update_T_nodes(self,seed_T:list,override:bool=True):
+        pass
+
 
     def before_detected_diffusion(self, seed_R_nodes: list, T_nodes: list=[], is_apply: bool = False):
         '''Simulation test of diffusion
@@ -270,7 +277,8 @@ class model:
                         for nbr in nx.neighbors(G, node):
                             if G.nodes[nbr]['group'] != 1:
                                 search_range.put(nbr)
-            R_t_receiver_num[spread_time] = len(final_R_receiver)
+            if not nothing_change:
+                R_t_receiver_num[spread_time] = len(final_R_receiver)
 
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 
@@ -345,7 +353,8 @@ class model:
                     final_T_receiver[node] = 1
                     final_R_receiver.pop(node,0)
 
-            R_t_receiver_num[spread_time] = len(final_R_receiver)
+            if not nothing_change:
+                R_t_receiver_num[spread_time] = len(final_R_receiver)
         
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 #%%
