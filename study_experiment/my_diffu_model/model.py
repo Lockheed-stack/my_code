@@ -37,7 +37,7 @@ class model:
             self.G.nodes[node]['group'] = 0
 
         # update new correction threshold
-        for node in self.authoritative_T:
+        for node in self.authoritative_T.keys():
             self.G.nodes[node]['group'] = 2
             self.__new_correction_threshold(node,)
 
@@ -81,7 +81,7 @@ class model:
         #df = pd.DataFrame(self.G.degree, columns=['node', 'degree'], dtype=int).set_index('node')
         if T_percent == 0:
             self.droped_auT_df = self.df.copy()
-            return []
+            return {}
             
         median_degree = self.df['degree'].median()
 
@@ -92,9 +92,9 @@ class model:
         else:
             T_sample_df = ge_median_nodes.sample(frac=T_percent, replace=False)
 
-        T_nodes = list(T_sample_df.index)
+        T_nodes = T_sample_df.to_dict('index')
         
-        self.droped_auT_df = self.df.drop(T_nodes,)
+        self.droped_auT_df = self.df.drop(T_sample_df.index,)
         return T_nodes
 
     def __check_i_threshold(self, node, G: nx.Graph):
@@ -206,15 +206,78 @@ class model:
             self.G.nodes[node]['c_threshold'] = np.random.uniform()  # correction threshold
             self.G.nodes[node]['group'] = 0
         
-        for node in self.authoritative_T:
+        for node in self.authoritative_T.keys():
             self.G.nodes[node]['group'] = 2
             self.__new_correction_threshold(node,)
 
-    def update_T_nodes(self,seed_T:list,override:bool=True):
-        pass
+    def update_normal_T_nodes(self,G:nx.Graph,seed_T:list,override:bool=True):
+        if override:
+            for node in self.other_T.keys():
+                G.nodes[node]['group'] = 0
+            
+            self.other_T.clear()
+            for node in seed_T:
+                G.nodes[node]['group'] = 2
+                self.other_T[node]=1
+        else:
+            for node in seed_T:
+                G.nodes[node]['group'] = 2
+                self.other_T[node] = 1
 
+    def update_auT_nodes(self,G:nx.Graph,T_percent:float,override:bool=True):
+        if override:
+            pass
 
-    def before_detected_diffusion(self, seed_R_nodes: list, T_nodes: list=[], is_apply: bool = False):
+    def unblocking_diffusion(self,seed_R_nodes:list,is_apply:bool=False):
+        if not is_apply:
+            G:nx.Graph = self.G.copy()
+        else:
+            G = self.G
+        
+        spread_time = 0
+        final_R_receiver = {}
+        R_t_receiver_num = {0: len(seed_R_nodes)}
+        search_range = queue.SimpleQueue()
+
+        for node in self.authoritative_T.keys():
+            G.nodes[node]['group'] = 0
+
+        # init final_R_receiver & search_range
+        for node in seed_R_nodes:
+            final_R_receiver[node] = 1
+            G.nodes[node]['group'] = 1
+            G.nodes[node]['active_time'] = spread_time # record the active time of rumor node
+            for nbr in nx.neighbors(G, node):
+                if G.nodes[nbr]['group'] == 0:
+                    search_range.put(nbr)
+
+        nothing_change = False
+
+        while (not nothing_change):
+
+            nothing_change = True
+            circulation_times = search_range.qsize()
+            spread_time += 1
+
+            for i in range(circulation_times):
+                node = search_range.get()
+                if G.nodes[node]['group'] == 1: # This node is R-active (the search queue has two same nodes, the first node has been actived by rumor)
+                    continue
+                if self.__check_i_threshold(node, G) == 1:  # actived by rumor
+                    nothing_change = False
+                    G.nodes[node]['group'] = 1
+                    G.nodes[node]['active_time'] = spread_time
+                    final_R_receiver[node] = 1
+
+                    for nbr in nx.neighbors(G, node):
+                        if G.nodes[nbr]['group'] == 0:
+                            search_range.put(nbr)
+            if not nothing_change:
+                R_t_receiver_num[spread_time] = len(final_R_receiver)
+
+        return G, spread_time, final_R_receiver, R_t_receiver_num
+
+    def before_detected_diffusion(self, seed_R_nodes: list, T_nodes: list=None, is_apply: bool = False):
         '''Simulation test of diffusion
 
         Parameters
@@ -231,7 +294,9 @@ class model:
             G:nx.Graph = self.G.copy()
         else:
             G = self.G
-
+        if T_nodes is None:
+            T_nodes = []
+            
         spread_time = 0
         final_T_receiver = {}
         final_R_receiver = {}
@@ -239,7 +304,10 @@ class model:
         search_range = queue.SimpleQueue()
 
         # init final_T_receiver
-        for node in (self.authoritative_T + T_nodes):
+        for node in self.authoritative_T.keys():
+            final_T_receiver[node] = 1
+            G.nodes[node]['group'] = 2
+        for node in T_nodes:
             final_T_receiver[node] = 1
             G.nodes[node]['group'] = 2
 
@@ -247,6 +315,7 @@ class model:
         for node in seed_R_nodes:
             final_R_receiver[node] = 1
             G.nodes[node]['group'] = 1
+            G.nodes[node]['active_time'] = spread_time # record the active time of rumor node
             for nbr in nx.neighbors(G, node):
                 if G.nodes[nbr]['group'] != 1:  # including T-active nodes
                     search_range.put(nbr)
@@ -271,14 +340,15 @@ class model:
                 if self.__check_i_threshold(node, G) == 1:  # actived by rumor
                     nothing_change = False
                     G.nodes[node]['group'] = 1
+                    G.nodes[node]['active_time'] = spread_time
                     final_R_receiver[node] = 1
 
                     if not is_pause:  # avoid infinity adding nbr while 'is_pause' is true
                         for nbr in nx.neighbors(G, node):
                             if G.nodes[nbr]['group'] != 1:
                                 search_range.put(nbr)
-            if not nothing_change:
-                R_t_receiver_num[spread_time] = len(final_R_receiver)
+            #if not nothing_change:
+            R_t_receiver_num[spread_time] = len(final_R_receiver)
 
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 
@@ -292,6 +362,11 @@ class model:
         
         spr_search_range = queue.SimpleQueue() # the node in this queue must be inactived
         cor_search_range = queue.SimpleQueue() # the node in this queue must be R-actived
+
+        if T_node is not None:
+            for node in T_node:
+                G.nodes[node]['group'] = 1
+                final_T_receiver[node]=1
 
         # init spreading & correction search range
         for node in final_R_receiver.keys():
@@ -321,6 +396,7 @@ class model:
                     if check_status == 1: # actived by rumor
                         nothing_change = False
                         G.nodes[node]['group'] = 1
+                        G.nodes[node]['active_time'] = spread_time
                         final_R_receiver[node] = 1
 
                         for nbr in nx.neighbors(G,node): # update spread search range
@@ -359,6 +435,4 @@ class model:
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 #%%
 # ------------- test -------------------
-
-# %%
 # %%
