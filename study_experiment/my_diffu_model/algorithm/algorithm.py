@@ -4,7 +4,8 @@ from model import *
 #%%
 # Containment of rumor spread in complex social networks
 def ContrId_original(model:model, seed_R: list = None):
-    '''Contributors Identification
+    '''Contributors Identification.
+    The result has already excepted the seed of rumor node and authoritative T nodes.
 
     Parameters:
     ---------------
@@ -23,6 +24,8 @@ def ContrId_original(model:model, seed_R: list = None):
 
     for node in nx.nodes(res1[0]):
         if node in seed_R:
+            continue
+        if node in model.authoritative_T:
             continue
         if res1[0].nodes[node]['group'] == 0:
             node_contr[node]=0
@@ -134,28 +137,5 @@ def TCS(G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dic
         T_nodes.append(candidate_node)
         selected_T[candidate_node]=f_VB_negative
 
-    return T_nodes,selected_T
-# %%
-G1 = nx.read_adjlist('../dataset/dolphins.mtx',nodetype=int)
-#%%
-model1 = model(G1,0.004,)
-model1.authoritative_T
-# %%
-r_n = model1.generate_R_nodes()
-r_n
-# %%
-res1 = model1.before_detected_diffusion(r_n)
-res1
-# %%
-t_n = TCS(*res1,4)
-t_n
-# %%
-t_n2 = ContrId_original(model1,list(res1[3].keys()))
-t_n2[0:2]
-# %%
-res1_2 = model1.after_detected_diffusion(*res1,t_n[0])
-res1_2
-# %%
-res1_3 = model1.after_detected_diffusion(*res1,t_n2[0:4])
-res1_3
+    return T_nodes
 # %%
