@@ -365,7 +365,7 @@ class model:
 
         if T_node is not None:
             for node in T_node:
-                G.nodes[node]['group'] = 1
+                G.nodes[node]['group'] = 2
                 final_T_receiver[node]=1
 
         # init spreading & correction search range

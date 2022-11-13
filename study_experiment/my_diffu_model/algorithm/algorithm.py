@@ -1,6 +1,11 @@
 #%%
 import networkx as nx
 from model import *
+import math
+#%%
+'''
+select other T nodes to restrict and correct the rumor nodes after detected the rumor
+'''
 #%%
 # Containment of rumor spread in complex social networks
 def ContrId_original(model:model, seed_R: list = None):
@@ -45,42 +50,14 @@ def ContrId_original(model:model, seed_R: list = None):
     
     return result
 
-# def ContrId_after(model:model,seed_R:list=None):
-
-#     if seed_R is None:
-#         print('please give a seed_R')
-#         return []
-#     else:
-#         res1 = model.before_detected_diffusion(seed_R,[])
-#         new_seed_R = res1[3].keys()
-#         res2 = model.unblocking_diffusion(new_seed_R,)
-
-#     node_contr = {}
-
-#     for node in nx.nodes(res2[0]):
-#         if node in new_seed_R:
-#             continue
-#         if res2[0].nodes[node]['group'] == 0:
-#             node_contr[node]=0
-        
-#         elif res2[0].nodes[node]['group'] == 1:
-#             contr = 0
-#             for nbr in nx.neighbors(res2[0],node):
-#                 if res2[0].nodes[nbr]['group'] == 1:
-#                     if res2[0].nodes[node]['active_time'] < res2[0].nodes[nbr]['active_time']:
-#                         contr += 1
-#             node_contr[node] = contr
-    
-#     return sorted(node_contr.items(),key=lambda x:x[1],reverse=True)
 #----------------------------------------------------------------------------------------
 
 # %%
 # Minmizing rumor influence in multiplex online social networks based on human individual and social behaviors
-
 def TCS(G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dict, R_t_receiver_num:dict,k:int=0):
 
-    f_VB_negative = 1
-    selected_T = {}
+    f_VB_negative = 0
+    # selected_T = {}
     T_nodes = []
 
     for i in range(k):
@@ -97,8 +74,8 @@ def TCS(G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dic
                 continue
             elif node in final_R_receiver:
                 continue
-            elif node in selected_T:
-                continue
+            # elif node in selected_T:
+            #     continue
             else:
             # calculate the node probability density
                 sum_p_acc = 0
@@ -127,7 +104,7 @@ def TCS(G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dic
 
                 for nbr in nx.neighbors(G,node):
                     sum_p_acc += G.nodes[nbr]['i_threshold']
-                    cum_prod_e *= np.exp(-(G.nodes[nbr]['i_threshold'])*spread_time)
+                    cum_prod_e *= math.exp(-(G.nodes[nbr]['i_threshold'])*spread_time)
                 f_v = sum_p_acc * cum_prod_e
                 if f_VB_negative+f_v>curr_largest_f_VB:
                     curr_largest_f_VB = f_VB_negative+f_v
@@ -135,7 +112,28 @@ def TCS(G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dic
 
         f_VB_negative = curr_largest_f_VB
         T_nodes.append(candidate_node)
-        selected_T[candidate_node]=f_VB_negative
+        # selected_T[candidate_node]=f_VB_negative
 
     return T_nodes
+#%%
+#---------------------------------------
+def degree_based(G:nx.Graph,final_T_receiver:dict, final_R_receiver:dict,k:int=0):
+    sorted_deg = sorted(dict(G.degree()).items(),key=lambda x:x[1],reverse=True)
+    result = []
+    for node in sorted_deg:
+        if node[0] in final_T_receiver:
+            continue
+        elif node[0] in final_R_receiver:
+            continue
+        else:
+            result.append(node[0])
+            k-=1
+        if k<=0:
+            break
+    
+    return result
 # %%
+'''
+set monitoring T nodes to detect the rumor as soon as possible
+'''
+#%%
