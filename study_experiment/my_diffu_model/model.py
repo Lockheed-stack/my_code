@@ -164,7 +164,7 @@ class model:
         else:
             droped_T_df = self.droped_auT_df
 
-        
+        # organized R nodes and normal R nodes
         if org_R_rate>0:
             median_degree = droped_T_df['degree'].median()
             ge_median_df = droped_T_df.query(f'degree>={median_degree}')
@@ -186,8 +186,12 @@ class model:
 
             return org_R_nodes + normal_R_nodes
         
+        # only normal R nodes
         else:
-            normal_R_nodes = list(droped_T_df.sample(frac=all_R_rate,replace=False).index)
+            if (all_R_rate*droped_T_df.shape[0])<1:
+                normal_R_nodes = list(droped_T_df.sample(n=1,replace=False).index)
+            else:
+                normal_R_nodes = list(droped_T_df.sample(frac=all_R_rate,replace=False).index)
             
             self.stubborn_R.clear()
             for node in normal_R_nodes:
