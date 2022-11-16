@@ -137,3 +137,22 @@ def degree_based(G:nx.Graph,final_T_receiver:dict, final_R_receiver:dict,k:int=0
 set monitoring T nodes to detect the rumor as soon as possible
 '''
 #%%
+# degree based algorithm.
+def set_M_degree(model:model,k:int=0):
+    sorted_deg = sorted(dict(model.G.degree()).items(),key=lambda x:x[1],reverse=True)
+    result = []
+    for node in sorted_deg:
+        if node[0] in model.authoritative_T:
+            continue
+        else:
+            result.append(node[0])
+            k-=1
+        if k<=0:
+            break
+    
+    return result
+#%%
+# random select 
+def set_M_random(model:model,k:int=0):
+    return list(model.droped_auT_df.sample(k,replace=False).to_dict('index').keys())
+# %%
