@@ -2,6 +2,8 @@
 import networkx as nx
 from model import *
 import math
+from queue import SimpleQueue
+from scipy.stats import entropy
 #%%
 '''
 select other T nodes to restrict and correct the rumor nodes after detected the rumor
@@ -141,18 +143,95 @@ set monitoring T nodes to detect the rumor as soon as possible
 def set_M_degree(model:model,k:int=0):
     sorted_deg = sorted(dict(model.G.degree()).items(),key=lambda x:x[1],reverse=True)
     result = []
-    for node in sorted_deg:
-        if node[0] in model.authoritative_T:
-            continue
-        else:
+
+    if k==0:
+        for node in sorted_deg:
             result.append(node[0])
-            k-=1
-        if k<=0:
-            break
+    else:
+        for node in sorted_deg:
+            if node[0] in model.authoritative_T:
+                continue
+            else:
+                result.append(node[0])
+                k-=1
+            if k<=0:
+                break
     
     return result
 #%%
 # random select 
 def set_M_random(model:model,k:int=0):
     return list(model.droped_auT_df.sample(k,replace=False).to_dict('index').keys())
+# %%
+# Identifying Important Nodes in Complex Networks Based on Node Propagation Entropy
+def propagation_entropy(model:model,k:int=0):
+    '''Using propagation entropy to select monitoring T nodes
+        Note: The result has been removed the authoritative T nodes.
+
+    Parameters
+    ----------
+    model : model
+        my model
+    k : int, optional
+        the number of monitoring T nodes, by default 0.
+        Note: If k=0 then will return the propagation entropy of all nodes.(except the authoritative T nodes)
+
+    Returns
+    -------
+    list
+        the list of propagation entropy of nodes.
+    '''
+    # compute the clustering coefficient: c_i
+    c_i = nx.clustering(model.G,)
+    
+    # compute the clustering coefficient and neighbors: cn_i
+    cn_i = {}
+    for node in model.G.nodes():
+        nbr_queue = SimpleQueue()
+        check_nbr = {}
+        n1_num = nx.degree(model.G,node)
+        n2_num = 0
+        for nbr in nx.neighbors(model.G,node):
+            nbr_queue.put(nbr)
+        
+        while not nbr_queue.empty():
+            get_node = nbr_queue.get()
+            for nbr in nx.neighbors(model.G,get_node):
+                if nbr not in check_nbr:
+                    n2_num+=1
+                    check_nbr[nbr]=1
+        
+        cn_i[node]=(n1_num+n2_num)/(c_i[node]+1)
+    
+    # compute the entropy: PE_i
+    sum_cn_i = sum(cn_i.values())
+    I_i = {}
+    PE_i = {}
+
+    for node in model.G.nodes():
+        I_i[node] = cn_i[node]/sum_cn_i
+    
+    for node in model.G.nodes():
+        nbr_I_i_list = []
+        for nbr in nx.neighbors(model.G,node):
+            nbr_I_i_list.append(I_i[nbr])
+        PE_i[node] = entropy(nbr_I_i_list)
+    
+    # sorted
+    sorted_PE = sorted(PE_i.items(),key=lambda x:x[1],reverse=True)
+    result = []
+    if k==0:
+        for node in sorted_PE:
+            result.append(node[0])
+    else:
+        for node in sorted_PE:
+            if node[0] in model.authoritative_T:
+                continue
+            else:
+                result.append(node[0])
+                k-=1
+                if k<=0:
+                    break
+    
+    return result
 # %%

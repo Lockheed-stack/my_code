@@ -353,7 +353,12 @@ class model:
                                 search_range.put(nbr)
             #if not nothing_change:
             R_t_receiver_num[spread_time] = len(final_R_receiver)
-
+        
+        # the spreading stopped before detection
+        if not is_pause:
+            R_t_receiver_num[spread_time+6] = len(final_R_receiver)
+            spread_time+=6
+            
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 
     def after_detected_diffusion(self,G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dict, R_t_receiver_num:dict,T_node:list=None):
