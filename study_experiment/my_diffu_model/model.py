@@ -2,8 +2,8 @@
 import networkx as nx
 import numpy as np
 import pandas as pd
-import queue
-
+from queue import SimpleQueue
+from random import randint
 #%%
 class model:
 
@@ -54,7 +54,7 @@ class model:
         n_th_nbr : int, optional
             The range of au_T nodes'influence, by default 3.
         '''
-        nbr_queue = queue.SimpleQueue()
+        nbr_queue = SimpleQueue()
         checked_node = {au_node: 1}
 
         for nbr in nx.neighbors(self.G, au_node):
@@ -241,7 +241,7 @@ class model:
         spread_time = 0
         final_R_receiver = {}
         R_t_receiver_num = {0: len(seed_R_nodes)}
-        search_range = queue.SimpleQueue()
+        search_range = SimpleQueue()
 
         for node in self.authoritative_T.keys():
             G.nodes[node]['group'] = 0
@@ -305,7 +305,11 @@ class model:
         final_T_receiver = {}
         final_R_receiver = {}
         R_t_receiver_num = {0: len(seed_R_nodes)}
-        search_range = queue.SimpleQueue()
+        search_range = SimpleQueue()
+        
+        candidate_node_dict = self.droped_auT_df.drop(seed_R_nodes+T_nodes).to_dict('index')
+        new_gen_node_num = 0
+        first_stop_time = 0
 
         # init final_T_receiver
         for node in self.authoritative_T.keys():
@@ -346,18 +350,38 @@ class model:
                     G.nodes[node]['group'] = 1
                     G.nodes[node]['active_time'] = spread_time
                     final_R_receiver[node] = 1
+                    candidate_node_dict.pop(node)
 
                     if not is_pause:  # avoid infinity adding nbr while 'is_pause' is true
                         for nbr in nx.neighbors(G, node):
                             if G.nodes[nbr]['group'] != 1:
                                 search_range.put(nbr)
-            #if not nothing_change:
+
             R_t_receiver_num[spread_time] = len(final_R_receiver)
-        
+            
+            # the spreading stopped before detection
+            if (nothing_change) and (not is_pause):
+                # random select a node from candidate_node_df as R-node to continue spread
+                new_gen_node = list(candidate_node_dict.keys())[randint(0,len(candidate_node_dict))]
+                candidate_node_dict.pop(new_gen_node)
+
+                for nbr in nx.neighbors(G, new_gen_node):
+                    if G.nodes[nbr]['group'] != 1:  # including T-active nodes
+                        search_range.put(nbr)
+                        
+                G.nodes[new_gen_node]['group'] = 1
+                G.nodes[new_gen_node]['active_time'] = spread_time
+                final_R_receiver[new_gen_node] = 1
+                R_t_receiver_num[spread_time] = len(final_R_receiver)
+                nothing_change = False
+                
+                if first_stop_time == 0:
+                    first_stop_time = spread_time
+                new_gen_node_num +=1
         # the spreading stopped before detection
-        if not is_pause:
-            R_t_receiver_num[spread_time+6] = len(final_R_receiver)
-            spread_time+=6
+        # if not is_pause:
+        #     R_t_receiver_num[spread_time+6] = len(final_R_receiver)
+        #     spread_time+=6 # six degree of separation
             
         return G, spread_time, final_T_receiver, final_R_receiver, R_t_receiver_num
 
@@ -369,8 +393,8 @@ class model:
         final_R_receiver = final_R_receiver.copy()
         R_t_receiver_num = R_t_receiver_num.copy()
         
-        spr_search_range = queue.SimpleQueue() # the node in this queue must be inactived
-        cor_search_range = queue.SimpleQueue() # the node in this queue must be R-actived
+        spr_search_range = SimpleQueue() # the node in this queue must be inactived
+        cor_search_range = SimpleQueue() # the node in this queue must be R-actived
 
         if T_node is not None:
             for node in T_node:
