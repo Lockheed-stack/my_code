@@ -1,6 +1,6 @@
 #%%
 import networkx as nx
-import numpy as np
+from numpy import random,exp
 import pandas as pd
 from queue import SimpleQueue
 from random import randint
@@ -32,8 +32,8 @@ class model:
             T-active:2
         '''
         for node in nx.nodes(G):
-            self.G.nodes[node]['i_threshold'] = np.random.uniform()  # influenced threshold
-            self.G.nodes[node]['c_threshold'] = np.random.uniform()  # correction threshold
+            self.G.nodes[node]['i_threshold'] = random.uniform()  # influenced threshold
+            self.G.nodes[node]['c_threshold'] = random.uniform()  # correction threshold
             self.G.nodes[node]['group'] = 0
 
         # update new correction threshold
@@ -66,7 +66,7 @@ class model:
 
             # update new correction threshold
             p = self.G.nodes[node]['c_threshold']
-            self.G.nodes[node]['c_threshold'] = p - p / (1 + np.exp(beta * (order)))
+            self.G.nodes[node]['c_threshold'] = p - p / (1 + exp(beta * (order)))
 
             if order < n_th_nbr:
                 for nbr in nx.neighbors(self.G, node):
@@ -206,8 +206,8 @@ class model:
             self.authoritative_T = self.select_authoritative_T_nodes(au_T_rate)
         
         for node in nx.nodes(self.G):
-            self.G.nodes[node]['i_threshold'] = np.random.uniform()  # influenced threshold
-            self.G.nodes[node]['c_threshold'] = np.random.uniform()  # correction threshold
+            self.G.nodes[node]['i_threshold'] = random.uniform()  # influenced threshold
+            self.G.nodes[node]['c_threshold'] = random.uniform()  # correction threshold
             self.G.nodes[node]['group'] = 0
         
         for node in self.authoritative_T.keys():
@@ -320,13 +320,16 @@ class model:
             G.nodes[node]['group'] = 2
 
         # init final_R_receiver & search_range
+        spr_has_checked = {}
         for node in seed_R_nodes:
             final_R_receiver[node] = 1
             G.nodes[node]['group'] = 1
             G.nodes[node]['active_time'] = spread_time # record the active time of rumor node
             for nbr in nx.neighbors(G, node):
                 if G.nodes[nbr]['group'] != 1:  # including T-active nodes
-                    search_range.put(nbr)
+                    if nbr not in spr_has_checked:
+                        search_range.put(nbr)
+                        spr_has_checked[nbr]=1
 
         nothing_change = False
         is_pause = False  # if monitoring T is encountered, then pause the diffusion
@@ -355,19 +358,23 @@ class model:
                     if not is_pause:  # avoid infinity adding nbr while 'is_pause' is true
                         for nbr in nx.neighbors(G, node):
                             if G.nodes[nbr]['group'] != 1:
-                                search_range.put(nbr)
+                                if nbr not in spr_has_checked:
+                                    search_range.put(nbr)
+                                    spr_has_checked[nbr]=1
 
             R_t_receiver_num[spread_time] = len(final_R_receiver)
             
             # the spreading stopped before detection
             if (nothing_change) and (not is_pause):
                 # random select a node from candidate_node_df as R-node to continue spread
-                new_gen_node = list(candidate_node_dict.keys())[randint(0,len(candidate_node_dict))]
+                new_gen_node = list(candidate_node_dict.keys())[randint(0,len(candidate_node_dict)-1)]
                 candidate_node_dict.pop(new_gen_node)
 
                 for nbr in nx.neighbors(G, new_gen_node):
                     if G.nodes[nbr]['group'] != 1:  # including T-active nodes
-                        search_range.put(nbr)
+                        if nbr not in spr_has_checked:
+                            search_range.put(nbr)
+                            spr_has_checked[nbr]=1
                         
                 G.nodes[new_gen_node]['group'] = 1
                 G.nodes[new_gen_node]['active_time'] = spread_time
@@ -400,18 +407,26 @@ class model:
             for node in T_node:
                 G.nodes[node]['group'] = 2
                 final_T_receiver[node]=1
-
+        
+        spr_has_checked={}
+        cor_has_checked={}
         # init spreading & correction search range
         for node in final_R_receiver.keys():
             for nbr in nx.neighbors(G,node):
                 if G.nodes[nbr]['group'] == 0: # the nbr is inactive
-                    spr_search_range.put(nbr)
+                    if nbr not in spr_has_checked:
+                        spr_search_range.put(nbr)
+                        spr_has_checked[nbr]=1
         for node in final_T_receiver.keys():
             for nbr in nx.neighbors(G,node):
                 if G.nodes[nbr]['group'] == 0: # the nbr is inactive
-                    spr_search_range.put(nbr)
+                    if nbr not in spr_has_checked:
+                        spr_search_range.put(nbr)
+                        spr_has_checked[nbr]=1
                 elif G.nodes[nbr]['group'] == 1: # the nbr is R-active
-                    cor_search_range.put(nbr)
+                    if nbr not in cor_has_checked:
+                        cor_search_range.put(nbr)
+                        cor_has_checked[nbr]=1
         
         nothing_change = False
         
@@ -421,35 +436,44 @@ class model:
             cor_circle_times = cor_search_range.qsize()
             spread_time += 1
 
-        # The phases of T & R spreading 
+            # The phases of T & R spreading 
             for i in range(spr_circle_times):
                 node = spr_search_range.get()
-                if G.nodes[node]['group'] == 0:
-                    check_status = self.__check_i_threshold(node,G)
-                    if check_status == 1: # actived by rumor
-                        nothing_change = False
-                        G.nodes[node]['group'] = 1
-                        G.nodes[node]['active_time'] = spread_time
-                        final_R_receiver[node] = 1
+                # if G.nodes[node]['group'] == 0:
+                check_status = self.__check_i_threshold(node,G)
+                if check_status == 1: # actived by rumor
+                    nothing_change = False
+                    G.nodes[node]['group'] = 1
+                    G.nodes[node]['active_time'] = spread_time
+                    final_R_receiver[node] = 1
 
-                        for nbr in nx.neighbors(G,node): # update spread search range
-                            if G.nodes[nbr]['group'] == 0:
+                    for nbr in nx.neighbors(G,node): # update spread search range
+                        if G.nodes[nbr]['group'] == 0:
+                            if nbr not in spr_has_checked:
                                 spr_search_range.put(nbr)
+                                spr_has_checked[nbr]=1
 
-                    elif check_status == 2: # actived by truth
-                        nothing_change = False
-                        G.nodes[node]['group'] =  2
-                        final_T_receiver[node] = 1
+                elif check_status == 2: # actived by truth
+                    nothing_change = False
+                    G.nodes[node]['group'] =  2
+                    final_T_receiver[node] = 1
 
-                        for nbr in nx.neighbors(G,node): # update spread search range
-                            if G.nodes[nbr]['group'] == 0:
+                    for nbr in nx.neighbors(G,node): # update spread search range
+                        if G.nodes[nbr]['group'] == 0:
+                            if nbr not in spr_has_checked:
                                 spr_search_range.put(nbr)
-                        
-                        for nbr in nx.neighbors(G,node):
-                            if G.nodes[nbr]['group'] == 1: # if the nbr is R-active, then update correction search range
+                                spr_has_checked[nbr]=1
+                        elif G.nodes[nbr]['group'] == 1: # if the nbr is R-active, then update correction search range
+                            if nbr not in cor_has_checked:
                                 cor_search_range.put(nbr)
+                                cor_has_checked[nbr]=1
+                    # for nbr in nx.neighbors(G,node):
+                    #     if G.nodes[nbr]['group'] == 1: # if the nbr is R-active, then update correction search range
+                    #         if nbr not in cor_has_checked:
+                    #             cor_search_range.put(nbr)
+                    #             cor_has_checked[nbr]=1
         
-        # The phases of correcting
+            # The phases of correcting
             for i in range(cor_circle_times):
                 node = cor_search_range.get()
                 
@@ -461,6 +485,16 @@ class model:
                     nothing_change = False
                     final_T_receiver[node] = 1
                     final_R_receiver.pop(node,0)
+
+                    for nbr in nx.neighbors(G,node): # update spread search range
+                        if G.nodes[nbr]['group'] == 0:
+                            if nbr not in spr_has_checked:
+                                spr_search_range.put(nbr)
+                                spr_has_checked[nbr]=1
+                        elif G.nodes[nbr]['group'] == 1: # if the nbr is R-active, then update correction search range
+                            if nbr not in cor_has_checked:
+                                cor_search_range.put(nbr)
+                                cor_has_checked[nbr]=1
 
             if not nothing_change:
                 R_t_receiver_num[spread_time] = len(final_R_receiver)

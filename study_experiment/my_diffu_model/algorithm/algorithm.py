@@ -90,7 +90,8 @@ def TCS(G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dic
                 if f_VB_negative+f_v>curr_largest_f_VB:
                     curr_largest_f_VB = f_VB_negative+f_v
                     candidate_node = node
-
+        if candidate_node == -1:
+            return T_nodes
         f_VB_negative = curr_largest_f_VB
         T_nodes.append(candidate_node)
         checked_node[candidate_node]=f_VB_negative
@@ -213,7 +214,51 @@ def motif_3_trt(G:nx.Graph,final_T_receiver:dict,final_R_receiver:dict,k:int=0):
                                 if select_num<=0:
                                     break
             return result
-# ---------------------------------------------
+# -------------------------------------------------------
+#%%
+def greedy(model:model,G:nx.Graph, spread_time:int, final_T_receiver:dict, final_R_receiver:dict, R_t_receiver_num:dict,k:int=0):
+    result = []
+    checked_node = {}
+
+    original_G = G.copy()
+    running_G = G.copy()
+    
+    # final_T_receiver = final_T_receiver.copy()
+    # final_R_receiver = final_R_receiver.copy()
+    # R_t_receiver_num = R_t_receiver_num.copy()
+    
+    # original_FT = final_T_receiver.copy()
+    # original_FR = final_R_receiver.copy()
+    # original_Rtn = R_t_receiver_num.copy()
+    while len(result)<k:
+        delta = 1e6
+        temp_node = None
+        temp_res = None
+        for node in G.nodes():
+            if node in final_T_receiver:
+                continue
+            elif node in final_R_receiver:
+                continue
+            elif node in checked_node:
+                continue
+            
+            temp_res = model.after_detected_diffusion(running_G,spread_time,final_T_receiver,final_R_receiver,R_t_receiver_num,result+[node])
+            if (len(temp_res[3])-len(temp_res[2])) < delta:
+                delta = len(temp_res[3])-len(temp_res[2])
+                temp_node = node
+            
+            running_G = original_G.copy()
+            # final_T_receiver = original_FT.copy()
+            # final_R_receiver = original_FR.copy()
+            # R_t_receiver_num = original_Rtn.copy()
+            
+        if temp_node is None:
+            return temp_res
+        checked_node[temp_node]=1
+        result.append(temp_node)
+        
+    return temp_res
+#----------------------------------------------------------------
 # %%
 '''
 set monitoring T nodes to detect the rumor as soon as possible
@@ -315,4 +360,148 @@ def propagation_entropy(model:model,k:int=0):
     
     return result
 # %%
+# ------------------------------------------------------------------------
+def distance_based(model:model,k:int=0,d:int=3):
+    '''Main idea: Starting from authoritative T nodes. 
+        Selecting the max degree node which d hops from the previous monitoring T node. 
+
+    Parameters
+    ----------
+    model : model
+        my model
+    k : int, optional
+        the number of monitoring T nodes, by default 0.
+    d : int, optional
+        the distance from previous monitoring T node, by default 3
+    '''
+    search_range = {} # {node:[from, d-th_nbr list]}
+    search_range_nbr = {} # the 1st order neighbors of nodes in search range
+    candidate_T_nodes = {}
+    
+    # init search range
+    for au_node in model.authoritative_T.keys():
+        nbr_queue = SimpleQueue()
+        checked_node = {au_node:1}
+        d_th_nbrs = []
+        latest_found_nbrs = []
+        for nbr in nx.neighbors(model.G,au_node):
+            if nbr in checked_node:
+                continue
+            nbr_queue.put((nbr,1)) # (node, i-th nbr)
+            checked_node[nbr]=1
+            search_range_nbr[nbr]=1
+
+        while not nbr_queue.empty():
+            node , order = nbr_queue.get()
+            latest_found_nbrs.append(node)
+            
+            if order < d:
+                for nbr in nx.neighbors(model.G,node):
+                    if nbr in checked_node:
+                        continue
+                    nbr_queue.put((nbr,order+1))
+                    checked_node[nbr]=1
+            else:
+                d_th_nbrs.append(node)
+        
+        if len(d_th_nbrs) == 0:
+            d_th_nbrs = latest_found_nbrs.copy()
+
+        search_range[au_node]=[None,d_th_nbrs]
+
+    # find k monitoring T nodes
+    while k>0:
+        from_node = None
+        candidate_node_1 = None
+        candidate_node_2 = None
+        candidate_node_3 = None
+        max_deg_1 = 0
+        max_deg_2 = 0
+        max_deg_3 = 0
+        for items in search_range.items():
+            for node in items[1][1]:
+                from_node  = node
+                if node not in search_range:
+                    # try not to be neighbor with the node in search range 
+                    if node not in search_range_nbr:
+                        if max_deg_1 < nx.degree(model.G,node):
+                            max_deg_1 = nx.degree(model.G,node)
+                            candidate_node_1 = node
+                    else:
+                        if max_deg_2 < nx.degree(model.G,node):
+                            max_deg_2 = nx.degree(model.G,node)
+                            candidate_node_2 = node
+                else:
+                    if max_deg_3 < nx.degree(model.G,node):
+                        max_deg_3 = nx.degree(model.G,node)
+                        candidate_node_3 = node
+
+        if candidate_node_1 is not None:
+            candidate_T_nodes[candidate_node_1]=1
+            candidate_node = candidate_node_1
+        elif candidate_node_2 is not None:
+            candidate_T_nodes[candidate_node_2]=1
+            candidate_node = candidate_node_2
+        else:
+            candidate_T_nodes[candidate_node_3]=1
+            candidate_node = candidate_node_3
+        k-=1
+        search_range[candidate_node]=[from_node,d_th_nbrs]
+        
+        # update search range
+        nbr_queue = SimpleQueue()
+        checked_node = {candidate_node:1}
+        d_th_nbrs = []
+        latest_found_nbrs = []
+        for nbr in nx.neighbors(model.G,candidate_node):
+            if nbr in search_range:
+                continue
+            nbr_queue.put((nbr,1)) # (node, i-th nbr)
+            checked_node[nbr]=1
+            search_range_nbr[nbr]=1
+            
+        while not nbr_queue.empty():
+            node , order = nbr_queue.get()
+            latest_found_nbrs.append(node)
+                
+            if order < d:
+                for nbr in nx.neighbors(model.G,node):
+                    if nbr in checked_node:
+                        continue
+                    nbr_queue.put((nbr,order+1))
+                    checked_node[nbr]=1
+            else:
+                d_th_nbrs.append(node)
+        if len(d_th_nbrs) == 0:
+            d_th_nbrs = latest_found_nbrs.copy()
+
+    return list(candidate_T_nodes.keys())
+    # return search_range
+# %%
+# G1 = nx.read_adjlist('../dataset/dolphins.mtx',nodetype=int)
+# #%%
+# model1 = model(G1,0.06)
+# model1.authoritative_T
+# # %%
+# monitor_T = distance_based(model1,5,)
+# monitor_T
+# #%%
+# mt  =set_M_degree(model1,5)
+# mt
+# # %%
+# from pyvis.network import Network
+# # %%
+# G_cp = model1.G.copy()
+# # %%
+# for node in G_cp.nodes():
+#     G_cp.nodes[node]['label'] = f'{node}'
+#     if node in list(monitor_T.keys()):
+#         G_cp.nodes[node]['group'] = 3
+# # %%
+# G_cp.nodes(data='label')
+
+# #%%
+# nt = Network(font_color='black')
+# nt.from_nx(G_cp)
+# nt.show('nx.html')
 # %%
