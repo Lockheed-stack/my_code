@@ -342,6 +342,7 @@ class model:
 
             for i in range(circulation_times):
                 node = search_range.get()
+                spr_has_checked.pop(node,0)
                 if G.nodes[node]['group'] == 1: # This node is R-active (the search queue has two same nodes, the first node has been actived by rumor)
                     continue
                 if G.nodes[node]['group'] == 2: # This node is T-active
@@ -361,7 +362,10 @@ class model:
                                 if nbr not in spr_has_checked:
                                     search_range.put(nbr)
                                     spr_has_checked[nbr]=1
-
+                else:
+                    search_range.put(node)
+                    spr_has_checked[node]=1
+                    
             R_t_receiver_num[spread_time] = len(final_R_receiver)
             
             # the spreading stopped before detection
@@ -439,6 +443,7 @@ class model:
             # The phases of T & R spreading 
             for i in range(spr_circle_times):
                 node = spr_search_range.get()
+                spr_has_checked.pop(node,0)
                 # if G.nodes[node]['group'] == 0:
                 check_status = self.__check_i_threshold(node,G)
                 if check_status == 1: # actived by rumor
@@ -467,16 +472,15 @@ class model:
                             if nbr not in cor_has_checked:
                                 cor_search_range.put(nbr)
                                 cor_has_checked[nbr]=1
-                    # for nbr in nx.neighbors(G,node):
-                    #     if G.nodes[nbr]['group'] == 1: # if the nbr is R-active, then update correction search range
-                    #         if nbr not in cor_has_checked:
-                    #             cor_search_range.put(nbr)
-                    #             cor_has_checked[nbr]=1
-        
+                else:
+                    spr_search_range.put(node)
+                    spr_has_checked[node]=1
+
             # The phases of correcting
             for i in range(cor_circle_times):
                 node = cor_search_range.get()
-                
+                cor_has_checked.pop(node,0)
+
                 if node in self.stubborn_R: # cannot correct the stubborn Rumor nodes, i.e. initial seed of Rumor nodes
                     continue
 
@@ -495,6 +499,9 @@ class model:
                             if nbr not in cor_has_checked:
                                 cor_search_range.put(nbr)
                                 cor_has_checked[nbr]=1
+                else:
+                    cor_search_range.put(node)
+                    cor_has_checked[node]=1
 
             if not nothing_change:
                 R_t_receiver_num[spread_time] = len(final_R_receiver)
