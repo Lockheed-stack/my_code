@@ -49,17 +49,46 @@ def greedy(process:int,model:model,G:nx.Graph, spread_time:int, final_T_receiver
         else:
             apart_nodes.append(nodes[i*range_size:(i+1)*range_size])
     
-    all_process = SimpleQueue()
-    for i in range(process*k):
-        all_process.put(Process(target=run_separately,args=(sub_result,apart_nodes[i%process],model,G,spread_time,final_T_receiver,final_R_receiver,R_t_receiver_num,choose_nodes)))
+    # all_process = SimpleQueue()
+    # for i in range(process*k):
+    #     all_process.put(Process(target=run_separately,args=(sub_result,apart_nodes[i%process],model,G,spread_time,final_T_receiver,final_R_receiver,R_t_receiver_num,choose_nodes)))
+
+    # temp_res = None
+    # temp_node = None
+    # with tqdm(total=process*k) as qbar:
+    #     while not all_process.empty():        
+    #         sub_process = []
+    #         for i in range(process):
+    #             p = all_process.get()
+    #             p.start()
+    #             sub_process.append(p)
+    #         for proc in sub_process:
+    #             proc.join()
+
+    #         delta = 1e6
+    #         while not sub_result.empty():
+    #             result = sub_result.get()
+    #             if temp_node is None:
+    #                 temp_node = result[1]
+    #             if temp_res is None:
+    #                 temp_res = result[2]
+
+    #             if result[0] < delta:
+    #                 delta = result[0]
+    #                 temp_node = result[1]
+    #                 temp_res = result[2]
+    #         choose_nodes.append(temp_node)
+    #         final_T_receiver[temp_node]=1
+    #         qbar.update(process)
+    # return temp_res
 
     temp_res = None
     temp_node = None
-    with tqdm(total=process*k) as qbar:
-        while not all_process.empty():        
+    with tqdm(total=k) as qbar:
+        while len(choose_nodes)<k:        
             sub_process = []
             for i in range(process):
-                p = all_process.get()
+                p = Process(target=run_separately,args=(sub_result,apart_nodes[i],model,G,spread_time,final_T_receiver,final_R_receiver,R_t_receiver_num,choose_nodes))
                 p.start()
                 sub_process.append(p)
             for proc in sub_process:
@@ -79,7 +108,7 @@ def greedy(process:int,model:model,G:nx.Graph, spread_time:int, final_T_receiver
                     temp_res = result[2]
             choose_nodes.append(temp_node)
             final_T_receiver[temp_node]=1
-            qbar.update(process)
+            qbar.update(1)
     return temp_res
 #%%
 def sim_greedy(process:int,model:model,au_T_rate:float=0.005,r_rate:float=0.01,T_rate:float=0.01,iters:int=500):
@@ -131,7 +160,7 @@ if __name__=='__main__':
     # iters=1
     # T_rate = 0.005
 
-    G = nx.read_adjlist('../dataset/USpowerGrid.mtx',nodetype=int,)
+    G = nx.read_adjlist('../dataset/trimed_netScience.csv',nodetype=int,delimiter=',')
     model1 = model(G,0.004,)
     
     res = sim_greedy(subprocess_num,model1,0.005,0.05,T_rate,iters)
@@ -142,5 +171,5 @@ if __name__=='__main__':
         with open(f'{name}.pkl','wb') as f:
             pickle.dump(res,f)
     print(res)
- 
+
 # %%

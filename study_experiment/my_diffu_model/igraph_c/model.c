@@ -27,6 +27,9 @@ void init(model *M, const igraph_t G, double au_T_rate)
     igraph_vit_t vit;
     igraph_vit_create(&(M->G), igraph_vss_all(), &vit);
 
+    struct timeval start;
+    gettimeofday(&start, NULL);                           // need microsecond
+    igraph_rng_seed(igraph_rng_default(), start.tv_usec); // init random number generator seed
     while (!IGRAPH_VIT_END(vit))
     {
         igraph_integer_t vid = IGRAPH_VIT_GET(vit);
@@ -43,13 +46,6 @@ void init(model *M, const igraph_t G, double au_T_rate)
     // select authoritative T nodes & update group information
     init_auT_nodes(M, au_T_rate);
 
-    // igraph_vit_create(&(M->G), igraph_vss_all(), &vit);
-    // while(!IGRAPH_VIT_END(vit))
-    // {
-    //     printf("node id: %ld, ithr:%f, cthr:%f\n",IGRAPH_VIT_GET(vit),VAN(&(M->G),"ithr",IGRAPH_VIT_GET(vit)),VAN(&(M->G),"cthr",IGRAPH_VIT_GET(vit)));
-    //     IGRAPH_VIT_NEXT(vit);
-    // }
-    // igraph_vit_destroy(&vit);
     // update correction thresholds for nodes which under the influence by au_T nodes
     new_correction_threshold(M, 1, 3);
 }
@@ -77,6 +73,7 @@ void init_auT_nodes(model *M, double au_T_rate)
     {
         num_of_select = 1;
     }
+    
     igraph_vector_int_init(&(M->authoritative_T_vector), num_of_select);
     igraph_vector_int_fill(&(M->authoritative_T_vector), -1);
     struct timeval start;
@@ -215,7 +212,7 @@ bool check_c_thr(const igraph_t *G, igraph_integer_t node)
     return false;
 }
 
-igraph_vector_int_t generate_R_nodes(const model M, double R_rate)
+void generate_R_nodes(const model M, double R_rate, igraph_vector_int_t *R_nodes)
 {
     /* The generated R nodes will be stored in R_nodes */
     int available_num = igraph_vcount(&(M.G)) - igraph_vector_int_size(&(M.authoritative_T_vector));
@@ -224,8 +221,8 @@ igraph_vector_int_t generate_R_nodes(const model M, double R_rate)
     {
         select_num = 1;
     }
-    igraph_vector_int_t R_nodes;
-    igraph_vector_int_init(&R_nodes, select_num);
+    // igraph_vector_int_t R_nodes;
+    igraph_vector_int_init(R_nodes, select_num);
 
     struct timeval start;
     gettimeofday(&start, NULL);                           // need microsecond
@@ -234,11 +231,11 @@ igraph_vector_int_t generate_R_nodes(const model M, double R_rate)
     {
         int node = igraph_rng_get_integer(igraph_rng_default(), 0, igraph_vcount(&(M.G)) - 1);
 
-        if (!igraph_vector_int_contains(&R_nodes, node))
+        if (!igraph_vector_int_contains(R_nodes, node))
         {
             if (!igraph_vector_int_contains(&(M.authoritative_T_vector), node))
             {
-                igraph_vector_int_set(&R_nodes, i, node);
+                igraph_vector_int_set(R_nodes, i, node);
                 i++;
             }
         }
@@ -247,46 +244,50 @@ igraph_vector_int_t generate_R_nodes(const model M, double R_rate)
             continue;
         }
     }
-    return R_nodes;
+    // return R_nodes;
 }
 
-igraph_t before_detected_diffusion(const model M, const igraph_vector_int_t *R_nodes, igraph_vector_int_t *T_recv, igraph_vector_int_t *R_recv, int *spread_time)
+void before_detected_diffusion(const model M, igraph_t *G, const igraph_vector_int_t *R_nodes, igraph_vector_int_t *T_recv, igraph_vector_int_t *R_recv, int *spread_time)
 {
-    igraph_t G;
-    igraph_copy(&G, &(M.G));
-
-    igraph_vector_int_init(T_recv, igraph_vcount(&G));
-    igraph_vector_int_fill(T_recv, -1);
-    igraph_vector_int_init(R_recv, igraph_vcount(&G));
-    igraph_vector_int_fill(R_recv, -1);
+    // igraph_t G;
+    igraph_copy(G, &(M.G));
+    // igraph_vector_int_init(T_recv, igraph_vcount(G));
+    // igraph_vector_int_fill(T_recv, -1);
+    // igraph_vector_int_init(R_recv, igraph_vcount(G));
+    // igraph_vector_int_fill(R_recv, -1);
+    igraph_vector_int_init(T_recv,0);
+    igraph_vector_int_init(R_recv,0);
 
     igraph_dqueue_int_t queue;
-    igraph_dqueue_int_init(&queue, igraph_vcount(&G));
+    igraph_dqueue_int_init(&queue, igraph_vcount(G));
 
     // init T_recv
     for (int i = 0; i < igraph_vector_int_size(&M.authoritative_T_vector); i++)
     {
-        igraph_vector_int_set(T_recv, i, VECTOR(M.authoritative_T_vector)[i]);
+        // igraph_vector_int_set(T_recv, i, VECTOR(M.authoritative_T_vector)[i]);
+        igraph_vector_int_push_back(T_recv,VECTOR(M.authoritative_T_vector)[i]);
     }
 
     // init R_recv & search range
     igraph_vector_t v;
-    igraph_vector_init(&v, igraph_vcount(&G));
-    SETVANV(&G, "actTime", &v);
+    igraph_vector_init(&v, igraph_vcount(G));
+    SETVANV(G, "actTime", &v);
     igraph_vector_destroy(&v);
     int R_nodes_num = igraph_vector_int_size(R_nodes);
 
     for (int i = 0; i < igraph_vector_int_size(R_nodes); i++)
     {
-        igraph_vector_int_set(R_recv, i, VECTOR(*R_nodes)[i]);
-        igraph_cattribute_VAN_set(&G, "group", VECTOR(*R_nodes)[i], 1);
+        // igraph_vector_int_set(R_recv, i, VECTOR(*R_nodes)[i]);
+        igraph_integer_t node = igraph_vector_int_get(R_nodes,i);
+        igraph_vector_int_push_back(R_recv,node);
+        igraph_cattribute_VAN_set(G, "group", node, 1);
 
         igraph_vector_int_t nbr;
         igraph_vector_int_init(&nbr, 0);
-        igraph_neighbors(&G, &nbr, VECTOR(*R_nodes)[i], IGRAPH_OUT);
+        igraph_neighbors(G, &nbr, node, IGRAPH_OUT);
         for (int j = 0; j < igraph_vector_int_size(&nbr); j++)
         {
-            if (VAN(&G, "group", VECTOR(nbr)[j]) != 1) // including T-active nodes
+            if (VAN(G, "group", VECTOR(nbr)[j]) != 1) // including T-active nodes
             {
                 igraph_dqueue_int_push(&queue, VECTOR(nbr)[j]);
             }
@@ -301,36 +302,37 @@ igraph_t before_detected_diffusion(const model M, const igraph_vector_int_t *R_n
     {
         nothing_change = true;
         int circ_times = igraph_dqueue_int_size(&queue);
-        *spread_time=*spread_time+1;
+        *spread_time = *spread_time + 1;
 
         for (int i = 0; i < circ_times; i++)
         {
             int node = igraph_dqueue_int_pop(&queue);
-            if (VAN(&G, "group", node) == 1)
+            if (VAN(G, "group", node) == 1)
             {
                 continue;
             }
-            if (VAN(&G, "group", node) == 2)
+            if (VAN(G, "group", node) == 2)
             {
                 is_pause = true;
                 continue;
             }
-            if (check_i_thr(&G, node) == 1) // activated by rumor
+            if (check_i_thr(G, node) == 1) // activated by rumor
             {
                 nothing_change = false;
-                SETVAN(&G, "group", node, 1);
-                SETVAN(&G, "actTime", node, *spread_time);
-                igraph_vector_int_set(R_recv, R_nodes_num, node);
+                SETVAN(G, "group", node, 1);
+                SETVAN(G, "actTime", node, *spread_time);
+                // igraph_vector_int_set(R_recv, R_nodes_num, node);
+                igraph_vector_int_push_back(R_recv,node);
                 R_nodes_num++;
 
                 if (!is_pause)
                 {
                     igraph_vector_int_t nbr;
                     igraph_vector_int_init(&nbr, 0);
-                    igraph_neighbors(&G, &nbr, node, IGRAPH_OUT);
+                    igraph_neighbors(G, &nbr, node, IGRAPH_OUT);
                     for (int j = 0; j < igraph_vector_int_size(&nbr); j++)
                     {
-                        if (VAN(&G, "group", VECTOR(nbr)[j]) != 1) // including T-active nodes
+                        if (VAN(G, "group", VECTOR(nbr)[j]) != 1) // including T-active nodes
                         {
                             igraph_dqueue_int_push(&queue, VECTOR(nbr)[j]);
                         }
@@ -345,40 +347,44 @@ igraph_t before_detected_diffusion(const model M, const igraph_vector_int_t *R_n
             struct timeval start;
             gettimeofday(&start, NULL);
             igraph_rng_seed(igraph_rng_default(), start.tv_usec);
+            
+            // random select a node as R-node
             int rn_node = 0;
             while (true)
             {
-                rn_node = igraph_rng_get_integer(igraph_rng_default(), 0, igraph_vcount(&G) - 1);
-                if (!igraph_vector_int_contains(R_recv, rn_node))
+                rn_node = igraph_rng_get_integer(igraph_rng_default(), 0, igraph_vcount(G) - 1);
+                if ((!igraph_vector_int_contains(R_recv, rn_node)) && (!igraph_vector_int_contains(&M.authoritative_T_vector, rn_node)))
                 {
                     break;
                 }
             }
-            SETVAN(&G, "group", rn_node, 1);
-            SETVAN(&G, "actTime", rn_node, *spread_time);
-            igraph_vector_int_set(R_recv, R_nodes_num, rn_node);
+            SETVAN(G, "group", rn_node, 1);
+            SETVAN(G, "actTime", rn_node, *spread_time);
+            // igraph_vector_int_set(R_recv, R_nodes_num, rn_node);
+            igraph_vector_int_push_back(R_recv,rn_node);
+            R_nodes_num++;
 
+            //update search range
             igraph_vector_int_t nbr;
             igraph_vector_int_init(&nbr, 0);
-            igraph_neighbors(&G, &nbr, rn_node, IGRAPH_OUT);
+            igraph_neighbors(G, &nbr, rn_node, IGRAPH_OUT);
             for (int j = 0; j < igraph_vector_int_size(&nbr); j++)
             {
-                if (VAN(&G, "group", VECTOR(nbr)[j]) != 1) // including T-active nodes
+                if (VAN(G, "group", VECTOR(nbr)[j]) != 1) // including T-active nodes
                 {
                     igraph_dqueue_int_push(&queue, VECTOR(nbr)[j]);
                 }
             }
             igraph_vector_int_destroy(&nbr);
 
-            R_nodes_num++;
             nothing_change = false;
         }
     }
     igraph_dqueue_int_destroy(&queue);
-    return G;
+    // return G;
 }
 
-void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_vector_int_t *T_nodes, const igraph_vector_int_t *R_nodes, igraph_vector_int_t *T_recv, igraph_vector_int_t *R_recv, int *spread_time)
+void after_detected_diffusion(const igraph_t *res1, const igraph_vector_int_t *T_nodes, const igraph_vector_int_t *R_nodes, igraph_vector_int_t *T_recv, igraph_vector_int_t *R_recv, int *spread_time)
 {
     igraph_t G;
     igraph_copy(&G, res1);
@@ -388,17 +394,15 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
     igraph_dqueue_int_init(&spr_search_range, igraph_vcount(&G));
     igraph_dqueue_int_init(&cor_search_range, igraph_vcount(&G));
 
-    int T_nodes_num = igraph_vector_int_size(&M.authoritative_T_vector);
-    int R_nodes_num = count_vector_size(R_recv);
+    int T_nodes_num = igraph_vector_int_size(T_recv);
+    int R_nodes_num = igraph_vector_int_size(R_recv);
 
+    // init T_nodes group attribute
     for (int i = 0; i < igraph_vector_int_size(T_nodes); i++)
     {
-        if(VECTOR(*T_nodes)[i]==-1)
-        {
-            break;
-        }
-        SETVAN(&G, "group", VECTOR(*T_nodes)[i], 2);
-        igraph_vector_int_set(T_recv, T_nodes_num, VECTOR(*T_nodes)[i]);
+        igraph_integer_t node = igraph_vector_int_get(T_nodes,i);
+        igraph_cattribute_VAN_set(&G,"group",node,2);
+        igraph_vector_int_push_back(T_recv,node);
         T_nodes_num++;
     }
 
@@ -407,10 +411,6 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
     igraph_vector_int_init(&nbr, 0);
     for (int i = 0; i < igraph_vector_int_size(R_recv); i++)
     {
-        if (igraph_vector_int_get(R_recv, i) == -1)
-        {
-            break;
-        }
         igraph_neighbors(&G, &nbr, igraph_vector_int_get(R_recv, i), IGRAPH_OUT);
         for (int j = 0; j < igraph_vector_int_size(&nbr); j++)
         {
@@ -421,13 +421,15 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
             }
         }
     }
-
+    igraph_vector_int_destroy(&nbr);
+    
+    igraph_vector_int_init(&nbr, 0);
     for (int i = 0; i < igraph_vector_int_size(T_recv); i++)
     {
-        if (igraph_vector_int_get(T_recv, i) == -1)
-        {
-            break;
-        }
+        // if (igraph_vector_int_get(T_recv, i) == -1)
+        // {
+        //     break;
+        // }
         igraph_neighbors(&G, &nbr, igraph_vector_int_get(T_recv, i), IGRAPH_OUT);
         for (int j = 0; j < igraph_vector_int_size(&nbr); j++)
         {
@@ -443,19 +445,20 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
     }
     igraph_vector_int_destroy(&nbr);
 
+    // start diffusion
     bool nothing_change = false;
     while (!nothing_change)
     {
         nothing_change = true;
         int spr_circ_times = igraph_dqueue_int_size(&spr_search_range);
         int cor_circ_times = igraph_dqueue_int_size(&cor_search_range);
-        *spread_time=*spread_time+1;
+        *spread_time = *spread_time + 1;
 
         // the phase of T&R spreading
         for (int i = 0; i < spr_circ_times; i++)
         {
             int node = igraph_dqueue_int_pop(&spr_search_range);
-            if(VAN(&G,"group",node)!=0)
+            if (VAN(&G, "group", node) != 0)
             {
                 continue;
             }
@@ -465,7 +468,8 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
                 nothing_change = false;
                 SETVAN(&G, "group", node, 1);
                 SETVAN(&G, "actTime", node, *spread_time);
-                igraph_vector_int_set(R_recv, R_nodes_num, node);
+                // igraph_vector_int_set(R_recv, R_nodes_num, node);
+                igraph_vector_int_push_back(R_recv,node);
                 R_nodes_num++;
 
                 // update spread search range
@@ -485,7 +489,8 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
             {
                 nothing_change = false;
                 SETVAN(&G, "group", node, 2);
-                igraph_vector_int_set(T_recv, T_nodes_num, node);
+                // igraph_vector_int_set(T_recv, T_nodes_num, node);
+                igraph_vector_int_push_back(T_recv,node);
                 T_nodes_num++;
 
                 igraph_vector_int_t nbr;
@@ -504,13 +509,17 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
                 }
                 igraph_vector_int_destroy(&nbr);
             }
+            else //nothing happened
+            {
+                igraph_dqueue_int_push(&spr_search_range,node);
+            }
         }
 
         // the phase of correction
         for (int i = 0; i < cor_circ_times; i++)
         {
             int node = igraph_dqueue_int_pop(&cor_search_range);
-            if(VAN(&G,"group",node)!=1)
+            if (VAN(&G, "group", node) != 1)
             {
                 continue;
             }
@@ -522,18 +531,18 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
             {
                 SETVAN(&G, "group", node, 2);
                 nothing_change = false;
-                igraph_vector_int_set(T_recv, T_nodes_num, node);
+                // igraph_vector_int_set(T_recv, T_nodes_num, node);
+                igraph_vector_int_push_back(T_recv,node);
                 T_nodes_num++;
 
-                //remove R node from R_recv
+                // remove R node from R_recv
                 igraph_integer_t pos;
-                if(igraph_vector_int_search(R_recv,0,node,&pos))
+                if (igraph_vector_int_search(R_recv, 0, node, &pos))
                 {
                     igraph_vector_int_remove(R_recv, pos);
                     R_nodes_num--;
                 }
-                
-
+    
                 igraph_vector_int_t nbr;
                 igraph_vector_int_init(&nbr, 0);
                 igraph_neighbors(&G, &nbr, node, IGRAPH_OUT);
@@ -550,14 +559,16 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
                 }
                 igraph_vector_int_destroy(&nbr);
             }
+            else // nothing happened
+            {
+                igraph_dqueue_int_push(&cor_search_range,node);
+            }
         }
-        
     }
     igraph_dqueue_int_destroy(&spr_search_range);
     igraph_dqueue_int_destroy(&cor_search_range);
     igraph_destroy(&G);
 }
-
 
 // void after_detected_diffusion_2(const model M,const igraph_t *res1, const igraph_vector_int_t T_nodes, const igraph_vector_int_t R_nodes, igraph_vector_int_t *T_recv, igraph_vector_int_t *R_recv, int *spread_time)
 // int main()
@@ -681,6 +692,6 @@ void after_detected_diffusion(const model M,const igraph_t *res1, const igraph_v
 //     igraph_destroy(&G);
 //     igraph_destroy(&res1);
 //     igraph_destroy(&res2);
-    
+
 //     return 0;
 // }

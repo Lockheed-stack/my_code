@@ -68,6 +68,7 @@ func SelectMysqlManyRow(db *sql.DB) {
 
 	query_string := "select * from first_table"
 	r, err := db.Query(query_string)
+
 	if err != nil {
 		log.Panic(err)
 	} else {
@@ -76,7 +77,7 @@ func SelectMysqlManyRow(db *sql.DB) {
 			fmt.Printf("id: %v,name:%v\n", t.id, t.name)
 		}
 	}
-
+	defer r.Close()
 }
 
 // update value
@@ -89,4 +90,37 @@ func UpdateMysqlTable(db *sql.DB) {
 	i, _ := r.RowsAffected()
 	fmt.Printf("RowsAffected: %v\n", i)
 	SelectMysqlManyRow(db)
+}
+
+func DataFromWeb(email string, subject string, message string) error {
+
+	// connect mysql
+	db, err := sql.Open("mysql", "root:lilin001@tcp(127.0.0.1:3306)/forGo")
+	if err != nil {
+		log.Print(err)
+		return err
+	}
+
+	db.SetConnMaxLifetime(time.Minute * 3)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
+
+	err2 := db.Ping()
+	if err2 != nil {
+		log.Print(err2)
+		return err2
+	}
+
+	// insert vale
+	insert_string := "insert into from_web values(?,?,?)"
+	r, err3 := db.Exec(insert_string, email, subject, message)
+
+	if err3 != nil {
+		log.Print(err3)
+		return err3
+	}
+	i, _ := r.RowsAffected()
+	log.Printf("email:%v, subject:%v, message:%v, RowsAffected:%v\n", email, subject, message, i)
+
+	return nil
 }
