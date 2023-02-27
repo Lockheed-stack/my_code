@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	"example.com/golang_learning/MysqlTest"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+	"github.com/gorilla/websocket"
 )
 
 func WebServerHello() {
@@ -308,5 +309,82 @@ func Advanced_Middleware() {
 	a := ms[0](hello)
 	fmt.Printf("type:%T, value:%v", a, a)
 	http.HandleFunc("/", chain(hello, method("GET"), loggingV2()))
+	http.ListenAndServe("127.0.0.1:8080", nil)
+}
+
+// Session
+/*
+In this example we will only allow authenticated users to view our secret message on the /secret page.
+To get access to it, the will first have to visit /login to get a valid session cookie, which logs him in.
+Additionally he can visit /logout to revoke his access to our secret message.
+*/
+var (
+	key   = []byte("super-secret-key")
+	store = sessions.NewCookieStore(key)
+)
+
+func secret(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+
+	// check if user is authenticated
+	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	// print secret message
+	fmt.Fprintln(w, "The cake is a lie!")
+}
+func login(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	// Authentication goes here
+	// ....
+
+	// set user as authenticated
+	session.Values["authenticated"] = true
+	session.Save(r, w)
+}
+func logout(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	// revoke users authentication
+	session.Values["authenticated"] = false
+	session.Save(r, w)
+}
+func Session_test() {
+	http.HandleFunc("/secret", secret)
+	http.HandleFunc("/login", login)
+	http.HandleFunc("/logout", logout)
+	http.ListenAndServe("127.0.0.1:8080", nil)
+}
+
+// Websockets
+func WebSockets_test() {
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
+		conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
+		for {
+			// read message from browser
+			msgType, msg, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+
+			//print the message to the console
+			fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
+
+			//write message back to browser
+			if err = conn.WriteMessage(msgType, msg); err != nil {
+				return
+			}
+		}
+	})
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/websockets.html")
+	})
+
 	http.ListenAndServe("127.0.0.1:8080", nil)
 }
