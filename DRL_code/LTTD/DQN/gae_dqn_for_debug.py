@@ -65,8 +65,8 @@ class nerual_network(nn.Module):
         if is_for_learn:
             beta_action = self.lin2(x)
             expand_state = []
-            for state in state_emb:
-                expand_state.append(state.repeat(beta_action.shape[1],1))
+            for s in beta_state:
+                expand_state.append(s.repeat(beta_action.shape[1],1))
             expand_state = torch.stack(expand_state)
             out = nn.functional.relu(torch.cat([expand_state,beta_action], dim=2))
         else:
@@ -153,8 +153,8 @@ class DQN:
 
         if random.random() > eps_threshold:
             with torch.no_grad():
-                # node_index = tuple(map(lambda n:self.node_id_index_map[n],candidateNodes))
-                # sorted_index = sorted(node_index)
+                # node_index_0 = tuple(map(lambda n:self.node_id_index_map[n],candidateNodes))
+                # sorted_index = sorted(node_index_0)
                 node_index = []
                 for i,node in enumerate(state[0]):
                     if node==0:
@@ -188,15 +188,17 @@ class DQN:
 
         next_state_action_values = torch.zeros(
             (self.batch_size, 1), device=self.device)
+        # foo = torch.zeros(
+        #     (self.batch_size, 1), device=self.device)
         # for i, state_with_action in enumerate(batch.next_state):
         #     if state_with_action is not None:
         #         with torch.no_grad():
-        #             actions = torch.tensor(tuple(map(lambda n:self.node_id_index_map[n],state_with_action[1])))
-        #             next_state_action_values[i] = self.target_net(state_with_action[0], actions,True).max()
+        #             actions = torch.tensor(tuple(map(lambda n:self.node_id_index_map[n],state_with_action[2])))
+        #             foo[i] = self.target_net(state_with_action[0], actions,is_same_state=True).max()
         
         valid_action_mask = [] # for selecting valid actions in coresponding state
         not_none_state_mask = [] # for updating next_state_action_values
-        non_final_next_states = [] # for storing no-none next state
+        non_final_next_states = [] # for storing not-none next state
         for state in batch.next_state:
             if state is not None:
                 non_final_next_states.append(state[0])
@@ -211,12 +213,12 @@ class DQN:
         with torch.no_grad():
             result = self.target_net(non_final_next_states,None,is_for_learn=True)
         
-        torch_result = []
+        target_net_result = []
         for i in range(result.shape[0]):
-            torch_result.append(result[i,valid_action_mask[i]].max())
+            target_net_result.append(result[i,valid_action_mask[i]].max())
 
-        torch_result = torch.hstack(torch_result)
-        next_state_action_values[not_none_state_mask] = torch_result
+        target_net_result = torch.hstack(target_net_result)
+        next_state_action_values[not_none_state_mask] = target_net_result
 
         
         # compute the expected Q values
@@ -237,7 +239,8 @@ class DQN:
 def print_training_result(current_episode: int, episode_score: list, episode_loss: list):
     avg_score = np.array(episode_score).mean()
     avg_loss = torch.tensor(episode_loss).mean()
-    print(f'\nepisode:{current_episode}, last 100 average score:{avg_score:.3f}, last 100 average_loss:{avg_loss:.4f}')
+    # print(f'\nepisode:{current_episode}, last 100 average score:{avg_score:.3f}, last 100 average_loss:{avg_loss:.4f}')
+    return avg_score,avg_loss
 #%%
 def gather_replay_exp(
         dqn_model: DQN, 
@@ -295,65 +298,68 @@ def training(
     select_K_Tnodes = round(node_num*select_k_T)
     nodes_set = set(dqn_model.G.nodes())
 
-    gather_replay_exp(dqn_model,env,exp_gather_num,nodes_set,node_num,select_K_Tnodes,device)
+    # gather_replay_exp(dqn_model,env,exp_gather_num,nodes_set,node_num,select_K_Tnodes,device)
 
     
-    for i_episode in tqdm(range(1, num_episode + 1)):
-        # initialize the environment and get is's state
-        state, info = env.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        dqn_model.learn_step_counter += 1
-        for _ in count():
-            nodeState = info['T_active'] | info['R_active']
-            if node_num -len(nodeState) <= select_K_Tnodes :
-                break
-            
-            candidate_nodes = nodes_set-nodeState
-            action = dqn_model.choose_action(candidate_nodes, state)
-            # candidate_nodes.discard(action)
+    with tqdm(total=num_episode,desc='episode:Nan, score:Nan, loss:Nan,') as pbar:
+        for i_episode in range(1, num_episode + 1):
+            # initialize the environment and get is's state
+            state, info = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            dqn_model.learn_step_counter += 1
+            for _ in count():
+                nodeState = info['T_active'] | info['R_active']
+                if node_num -len(nodeState) <= select_K_Tnodes :
+                    break
+                
+                candidate_nodes = nodes_set-nodeState
+                action = dqn_model.choose_action(candidate_nodes, state)
+                candidate_nodes.discard(action)
 
-            obs, reward, terminated, _, info = env.step(action)# the env need the index of node
-            reward = torch.tensor([[reward]], device=device, dtype=torch.float32)
-            # need node index to select embeddings
-            action = torch.tensor([action], device=device)
-            done = terminated
+                obs, reward, terminated, _, info = env.step(action)# the env need the index of node
+                reward = torch.tensor([[reward]], device=device, dtype=torch.float32)
+                # need node index to select embeddings
+                action = torch.tensor([action], device=device)
+                done = terminated
 
-            if terminated:
-                next_state = None
-                dqn_model.memory.push(state, action, reward, next_state)
-            else:
-                next_state = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-                dqn_model.memory.push(state, action, reward, [next_state,~next_state.bool()])
+                if terminated:
+                    next_state = None
+                    dqn_model.memory.push(state, action, reward, next_state)
+                else:
+                    next_state = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+                    dqn_model.memory.push(state, action, reward, [next_state,~next_state.bool()])
 
-            # move to the next state
-            state = next_state
+                # move to the next state
+                state = next_state
 
-            loss = dqn_model.learn()
-            if done:
-                episode_score.append(
-                    len(info['T_active'])/len(info['R_active']))
-                if loss is not None:
-                    episode_loss.append(loss)
-                break
+                loss = dqn_model.learn()
+                if done:
+                    episode_score.append(
+                        len(info['T_active'])/len(info['R_active']))
+                    if loss is not None:
+                        episode_loss.append(loss)
+                    break
 
-        # target_net_state_dict = karate_dqn.target_net.state_dict()
-        # policy_net_state_dict = karate_dqn.policy_net.state_dict()
-        # for key in policy_net_state_dict:
-        #     target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
-        # karate_dqn.target_net.load_state_dict(target_net_state_dict)
+            # target_net_state_dict = karate_dqn.target_net.state_dict()
+            # policy_net_state_dict = karate_dqn.policy_net.state_dict()
+            # for key in policy_net_state_dict:
+            #     target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
+            # karate_dqn.target_net.load_state_dict(target_net_state_dict)
 
-        if i_episode % 100 == 0:
-            print_training_result(i_episode, episode_score, episode_loss)
-        if i_episode % 100 == 0:
-            dqn_model.target_net.load_state_dict(dqn_model.policy_net.state_dict())
+            if i_episode % 100 == 0:
+                res = print_training_result(i_episode, episode_score, episode_loss)
+                pbar.set_description(f'episode:{i_episode}, score:{res[0]:.3f}, loss:{res[1]:.3f}')
+                pbar.update(100)
+            if i_episode % 100 == 0:
+                dqn_model.target_net.load_state_dict(dqn_model.policy_net.state_dict())
 
-    print("Complete") 
+    print("Complete")
 #%%
 # ------------------------------ Dolphins -------------------------------------------
 G1 = nx.read_adjlist('../dataset/dolphins.mtx', nodetype=int)
 
 # %%
-BATCH_SIZE_DOL = 4
+BATCH_SIZE_DOL = 5
 NODE_NUM_DOL = G1.number_of_nodes()
 EPS_DECAY_DOL = 10000
 EPS_START_DOL = 0.99
@@ -364,7 +370,7 @@ MAX_MEMORY_CAPACITY = 10000
 
 # %%
 env1 = gym.make("LTTD-v0", G=G1, init_rumor_rate=0.1,
-                au_T_rate=0.08, k_budget=0.2, alpha=0.8)
+                au_T_rate=0.08, k_budget=0.05, alpha=0.8)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
 torch_geo_G1_data = utils.from_networkx(G1)
@@ -383,13 +389,14 @@ episode_loss_dol = []
 # %%
 # torch.autograd.set_detect_anomaly(True)
 training(dol_dqn, env1, NODE_NUM_DOL, episode_score_dol,
-         episode_loss_dol, 0.2, device,100,500)
-# #%%
+         episode_loss_dol, 0.05, device,20,5000)
+# %%
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
+writer = SummaryWriter(comment='_test')
 
 for i in range(len(episode_score_dol)):
     writer.add_scalar('GAE_DQN/Score',episode_score_dol[i],i+1)
 for i in range(len(episode_loss_dol)):
     writer.add_scalar('GAE_DQN/Loss',episode_loss_dol[i],i+1)
 #%%
+    
