@@ -49,7 +49,7 @@ class nerual_network(nn.Module):
         self.gcn2 = Custom_GCN(embeding_dim, edge_index)
         self.gcn3 = Custom_GCN(embeding_dim, edge_index)
 
-    def forward(self,state: torch.Tensor, action: torch.Tensor,is_same_state:bool=False):
+    def forward(self,state: torch.Tensor, action: torch.Tensor,is_same_state:bool=False,is_for_learn:bool=False):
         '''
         note: the action should be the index of node(NOT NODE ID!)
         '''
@@ -60,13 +60,22 @@ class nerual_network(nn.Module):
 
 
         state_emb = torch.sum(x,1)
-        action_emb = x[torch.arange(x.size(0)),action] # select coresponding action embedding
-
         beta_state = self.lin1(state_emb)
-        beta_action = self.lin2(action_emb)
-        if is_same_state:
-            beta_state = beta_state.repeat(beta_action.size(0),1)
-        out = nn.functional.relu(torch.cat([beta_state,beta_action], dim=1))
+        
+        if is_for_learn:
+            beta_action = self.lin2(x)
+            expand_state = []
+            for state in state_emb:
+                expand_state.append(state.repeat(beta_action.shape[1],1))
+            expand_state = torch.stack(expand_state)
+            out = nn.functional.relu(torch.cat([expand_state,beta_action], dim=2))
+        else:
+            action_emb = x[torch.arange(x.size(0)),action] # select coresponding action embedding
+            beta_action = self.lin2(action_emb)
+            if is_same_state:
+                beta_state = beta_state.repeat(beta_action.size(0),1)
+            out = nn.functional.relu(torch.cat([beta_state,beta_action], dim=1))
+            
         return self.lin3(out)
 
 # %%
@@ -135,7 +144,7 @@ class DQN:
         self.optim = optim.Adam(
             self.policy_net.parameters(), lr=LR, amsgrad=True)
         self.loss_fn = nn.SmoothL1Loss()
-
+    # @profile
     def choose_action(self, candidateNodes: set,state:torch.Tensor):
         '''
         This function will return the index of coresponding node
@@ -162,7 +171,7 @@ class DQN:
         else:
             action = list(candidateNodes)
             return self.node_id_index_map[random.choice(action)]
-
+    # @profile
     def learn(self):
         if len(self.memory) < self.batch_size:
             
@@ -174,16 +183,42 @@ class DQN:
         state_batch = torch.cat(batch.state)
         reward_batch = torch.cat(batch.reward)
         action_batch = torch.cat(batch.action)
-
+        
         state_action_values = self.policy_net(state_batch, action_batch)
 
         next_state_action_values = torch.zeros(
             (self.batch_size, 1), device=self.device)
-        for i, state_with_action in enumerate(batch.next_state):
-            if state_with_action is not None:
-                with torch.no_grad():
-                    actions = torch.tensor(tuple(map(lambda n:self.node_id_index_map[n],state_with_action[1])))
-                    next_state_action_values[i] = self.target_net(state_with_action[0], actions,True).max()
+        # for i, state_with_action in enumerate(batch.next_state):
+        #     if state_with_action is not None:
+        #         with torch.no_grad():
+        #             actions = torch.tensor(tuple(map(lambda n:self.node_id_index_map[n],state_with_action[1])))
+        #             next_state_action_values[i] = self.target_net(state_with_action[0], actions,True).max()
+        
+        valid_action_mask = [] # for selecting valid actions in coresponding state
+        not_none_state_mask = [] # for updating next_state_action_values
+        non_final_next_states = [] # for storing no-none next state
+        for state in batch.next_state:
+            if state is not None:
+                non_final_next_states.append(state[0])
+                valid_action_mask.append(state[1])
+                not_none_state_mask.append(True)
+            else:
+                not_none_state_mask.append(False)
+        
+        valid_action_mask = torch.cat(valid_action_mask).reshape(len(valid_action_mask),self.node_num,1)
+        not_none_state_mask = torch.tensor(not_none_state_mask,dtype=bool).reshape(self.batch_size,1)
+        non_final_next_states = torch.cat(non_final_next_states,)
+        with torch.no_grad():
+            result = self.target_net(non_final_next_states,None,is_for_learn=True)
+        
+        torch_result = []
+        for i in range(result.shape[0]):
+            torch_result.append(result[i,valid_action_mask[i]].max())
+
+        torch_result = torch.hstack(torch_result)
+        next_state_action_values[not_none_state_mask] = torch_result
+
+        
         # compute the expected Q values
         expected_state_action_values = (
             next_state_action_values*self.gamma) + reward_batch
@@ -236,7 +271,7 @@ def gather_replay_exp(
                 dqn_model.memory.push(state, action, reward, next_state)
             else:
                 next_state = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-                dqn_model.memory.push(state, action, reward, [next_state,candidate_nodes])
+                dqn_model.memory.push(state, action, reward, [next_state,~next_state.bool()])
 
             # move to the next state
             state = next_state
@@ -288,7 +323,7 @@ def training(
                 dqn_model.memory.push(state, action, reward, next_state)
             else:
                 next_state = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-                dqn_model.memory.push(state, action, reward, [next_state,candidate_nodes])
+                dqn_model.memory.push(state, action, reward, [next_state,~next_state.bool()])
 
             # move to the next state
             state = next_state
@@ -318,9 +353,9 @@ def training(
 G1 = nx.read_adjlist('../dataset/dolphins.mtx', nodetype=int)
 
 # %%
-BATCH_SIZE_DOL = 64
+BATCH_SIZE_DOL = 4
 NODE_NUM_DOL = G1.number_of_nodes()
-EPS_DECAY_DOL = 1000
+EPS_DECAY_DOL = 10000
 EPS_START_DOL = 0.99
 EPS_END_DOL = 0.05
 GAMMA_DOL = 0.9
@@ -329,9 +364,9 @@ MAX_MEMORY_CAPACITY = 10000
 
 # %%
 env1 = gym.make("LTTD-v0", G=G1, init_rumor_rate=0.1,
-                au_T_rate=0.08, k_budget=0.1, alpha=0.8)
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device = 'cpu'
+                au_T_rate=0.08, k_budget=0.2, alpha=0.8)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = 'cpu'
 torch_geo_G1_data = utils.from_networkx(G1)
 # %%
 with open('pre_trained_GAE_emb/dol_pretrained_emb', 'rb') as f:
@@ -348,8 +383,8 @@ episode_loss_dol = []
 # %%
 # torch.autograd.set_detect_anomaly(True)
 training(dol_dqn, env1, NODE_NUM_DOL, episode_score_dol,
-         episode_loss_dol, 0.1, device,100,128)
-#%%
+         episode_loss_dol, 0.2, device,100,500)
+# #%%
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
@@ -357,26 +392,4 @@ for i in range(len(episode_score_dol)):
     writer.add_scalar('GAE_DQN/Score',episode_score_dol[i],i+1)
 for i in range(len(episode_loss_dol)):
     writer.add_scalar('GAE_DQN/Loss',episode_loss_dol[i],i+1)
-# %%
-env1.reset()
-# %%
-res = env1.step(2)
-res
-# %%
-G1.nodes()
-# %%
-mat = nx.adjacency_matrix(G1).todense()
-mat
 #%%
-list(G1.neighbors(11))
-# %%
-mat[0][6]
-#%%
-tmp4 = torch.arange(1000000).reshape(1,-1)
-tmp4
-# %%
-def foo(tmp:torch.Tensor):
-    tmp = tmp.to('cuda')
-#%%
-foo(tmp4)
-tmp4
