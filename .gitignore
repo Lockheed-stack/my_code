@@ -4,3 +4,33 @@
 /ANN_learning
 __pycache__/
 /tutor_works
+/cpp_code
+/Angular_learning
+/Angular_projects
+/ccb_FrontEnd
+/go_code
+/go_demo
+/golang_learning
+/py_code
+/shell_script
+/DRL_code/Deep-Reinforcement-Learning-Algorithms-with-PyTorch
+/DRL_code/pytorch\ tutorial
+/DRL_code/pytorchRL\ tutorial
+/DRL_code/openai_gym_tutorial
+/DRL_code/LTTD/pickle_files
+/DRL_code/DQN_rumor_min/DRPM
+/DRL_code/gym_LTTD_v1
+/DRL_code/openai_stable_baselines3
+/Graph_embedding
+/study_experiment/my_diffu_model/build
+/study_experiment/my_diffu_model/igraph_c
+/study_experiment/my_diffu_model/model_gt_test
+/study_experiment/draw_animate_graph
+test*
+dataset/
+runs/
+*.pkl
+*.pth
+*.jpg
+*.png
+*.lprof
