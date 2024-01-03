@@ -180,26 +180,25 @@ class DQN:
         next_state_action_values = torch.zeros(
             (self.batch_size, 1), device=self.device)
         
-        valid_action_mask = [] # for selecting valid actions in coresponding state
+        invalid_action_mask = [] # for masking invalid actions in coresponding state
         not_none_state_mask = [] # for updating next_state_action_values
         non_final_next_states = [] # for storing not-none next state
         for state in batch.next_state:
             if state is not None:
                 non_final_next_states.append(state[0])
-                valid_action_mask.append(state[1])
+                invalid_action_mask.append(state[1])
                 not_none_state_mask.append(True)
             else:
                 not_none_state_mask.append(False)
         
-        valid_action_mask = torch.cat(valid_action_mask).reshape(len(valid_action_mask),self.node_num,1)
+        invalid_action_mask = torch.cat(invalid_action_mask).reshape(len(invalid_action_mask),self.node_num,1)
         not_none_state_mask = torch.tensor(not_none_state_mask,dtype=bool).reshape(self.batch_size,1)
         non_final_next_states = torch.cat(non_final_next_states,)
         with torch.no_grad():
             result = self.target_net(non_final_next_states,None,is_for_learn=True)
 
-        torch_result = torch.full((result.shape[0],self.node_num,1),float('-inf'),device=self.device)
-        torch_result[valid_action_mask] = result[valid_action_mask]
-        next_state_action_values[not_none_state_mask] = torch_result.max(1)[0].view(torch_result.shape[0])
+        result[invalid_action_mask] = float('-inf')
+        next_state_action_values[not_none_state_mask] = result.max(1)[0].view(result.shape[0])
 
 
         # compute the expected Q values
