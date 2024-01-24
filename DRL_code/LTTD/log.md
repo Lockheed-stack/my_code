@@ -944,7 +944,9 @@ food 网络。
 
 效果不是很稳定。
 
-目前没有使用奖励塑造，在正式传播前所有的 action 得到的 reward 都设为 1。尝试搜索合适的奖励塑造函数。
+目前没有使用奖励塑造，在正式传播前所有的 action 得到的 reward 都设为 1。在 dolphin 上的效果是不错，但网络一大就不好收敛。
+
+尝试搜索合适的奖励塑造函数。
 
 ## 修改 1
 
@@ -989,3 +991,199 @@ if reward > 0:
 1. USING_RECOMMEND = 0.2, target_to_reach = 0.15，alpha=0.8, punishment=0, 收敛速度变慢、最终效果变差；
 2. USING_RECOMMEND = 0.5, target_to_reach = 0.15，alpha=0.8, punishment=0, 收敛速度一般，但效果差；
 3. USING_RECOMMEND = 0.2, target_to_reach = 0，alpha=0.8, punishment=0, 收敛速度一般，总体效果一般，但比 1 好；
+
+初步分析：
+1. 由于设置了 target_to_reach, 导致 RN_rate 和 TR_rate 的奖励只能二选一，这也就使得前两次训练，在遏制方面效果还不错，但传播方面就很差。
+2. 对于 punishment，在第三次实验时，已经将 target_to_reach=0，跟之前训练的环境很接近了，但 punishment=0，低于 median_degree 的奖励就置为0。感觉 punishment 的设置不太合理，毕竟无论选什么节点，至少都能增加一个 T 节点。
+
+修改 reward shaping：
+
+```python
+R_around_num = 0
+# rough estimate influence
+for nbr in self.G.neighbors(action):
+   if self.G.nodes[nbr]['group'] == 1:
+       R_around_num +=1
+
+reward = R_around_num + (self.G.degree(action)*self.alpha)
+
+return reward
+```
+
+RN_rate 和 TR_rate 奖励都可以同时触发，但稍微降低了总奖励
+
+```python
+RN_rate = len(self.final_R_receiver) / self.nodes_num
+TR_rate = len(self.final_T_receiver) / len(self.final_R_receiver)
+
+delta_R = (len(self.final_R_receiver)-R_start_num)
+delta_T = (len(self.final_T_receiver)-T_start_num)
+
+reward = delta_T-delta_R
+
+if reward > 0:
+    if RN_rate <= self.target_to_reach:
+        reward *= 1.75
+    if TR_rate >= 5:
+        reward *= 2
+    elif TR_rate >= 2:
+        reward *= 1.5
+```
+
+再次实验：
+1. USING_RECOMMEND = 0.5, target_to_reach = 0.145，alpha=0.8，收敛速度比前面3个都快，效果比较接近目前最佳结果；排 No.1
+2. USING_RECOMMEND = 0.5, target_to_reach = 0.145，alpha=0.5，收敛速度快，但无明显上升走势，最终效果略逊于 1。排 No.2
+3. USING_RECOMMEND = 0.5, target_to_reach = 0.155，alpha=0.8，收敛速度快，走势与 2 接近，效果比 2 差。排 No.4
+4. USING_RECOMMEND = 0.2, target_to_reach = 0.155，alpha=0.8，收敛速度中等，有明显上升趋势，但效果一般。排 No.3
+5. USING_RECOMMEND = 0.5, target_to_reach = 0.155，alpha=0.5，收敛速度快，有明显上升趋势，但效果最差。排 No.5
+
+![](result_img/DOL_GAT_DQN_Score.svg.png)
+
+就目前结果来看，加大最终奖励，通常会有不错的效果；
+
+
+# 2024.1.21
+
+增加总奖励：
+```python
+if reward > 0:
+    if RN_rate <= self.target_to_reach:
+        reward *= 2.3
+    if TR_rate >= 5:
+        reward *= 2.3
+    elif TR_rate >= 2:
+        reward *= 2
+```
+
+再次实验：
+1. USING_RECOMMEND = 0.5, target_to_reach = 0.145，alpha=0.5，效果差。
+2. USING_RECOMMEND = 0.5, target_to_reach = 0.145，alpha=0.8，效果中上，离最佳效果还有一定距离。
+
+![](result_img/DOL_GAT_DQN_Score.part2.png)
+
+alpha 减小，会有明显上升趋势，但最终效果不会很好；
+alpha 增大，在后半段会出现上升，最终效果还行。
+
+# 2024.1.22
+
+调整思路，target_to_reach 转为 TR_rate。不使用 reward shaping
+
+改动如下：
+
+```python
+if reward > 0:
+    if TR_rate >= self.target_to_reach:
+        reward *= 3
+    elif TR_rate > max(self.target_to_reach/2,1):
+        reward *= 2.2
+```
+
+实验：
+1. USING_RECOMMEND = 0.5, target_to_reach = 6, 效果与最佳持平。排 No.1
+2. USING_RECOMMEND = 0.5, target_to_reach = 6.5, 效果略微下降。排 No.2
+3. USING_RECOMMEND = 0.5, target_to_reach = 7, 效果与最佳持平。排 No.1
+4. USING_RECOMMEND = 0.5, target_to_reach = 7.5, 效果略微下降。排 No.2
+5. USING_RECOMMEND = 0.5, target_to_reach = 8, 效果略微下降。排 No.2
+
+![](result_img/DOL_GAT_DQN_diff_target.png)
+
+可以看到，训练走势很接近。增大 target_to_reach 会影响最终效果，合理设置 target_to_reach 会让 agent 得到最高档的奖励；过高的 target_to_reach 只能让 agent 获得第二档奖励，但这并不意味着 agent 所采取的 action 不值得拥有这么多奖励，只是目标太高了。
+
+
+food 网络训练，没使用 reward shaping，使用新的总奖励。训练 100000 次。
+
+参数如下：
+
+- BATCH_SIZE_FD = 64
+- NODE_NUM_FD = G1.number_of_nodes()
+- EPS_DECAY_FD = 50000
+- EPS_START_FD = 0.99
+- EPS_END_FD = 0.05
+- GAMMA_FD = 0.9
+- LEARNING_RATE_FD = 1e-3
+- HEADS = 1
+- NEGATIVE_SLOPE = 0.2
+- MAX_MEMORY_CAPACITY = 100000
+- USING_RECOMMEND = 0.8
+- target_to_reach=1.8
+
+|         | 0.01    | 0.0144  | 0.0188  | 0.0233 | 0.0277  | 0.0322  | 0.0366  | 0.041   | 0.0455  | 0.05    |
+| ------- | ------- | ------- | ------- | ------ | ------- | ------- | ------- | ------- | ------- | ------- |
+| R nodes | 116.994 | 108.188 | 103.842 | 98.502 | 96.246  | 92.54   | 96.778  | 95.586  | 90.744  | 90.07   |
+| T nodes | 76.724  | 115.098 | 152.836 | 163.41 | 177.218 | 191.636 | 200.606 | 208.984 | 220.542 | 235.204 |
+
+新纪录！
+
+# 2024.1.23
+
+3 层 GAT 的计算量有点大，可否在不降低效果的情况下，减少 GAT 的层数？
+
+论文
+
+@inproceedings{Zhang2020AdaptiveSF,
+  title={Adaptive Structural Fingerprints for Graph Attention Networks},
+  author={Kai Zhang and Yaokang Zhu and Jun Wang and Jie Zhang},
+  booktitle={International Conference on Learning Representations},
+  year={2020},
+  url={https://api.semanticscholar.org/CorpusID:212901464}
+}
+
+提到，GAT 在聚合多阶邻居时，聚合效果不如一阶邻居的聚合。
+
+
+实验网络 dolphins
+1. 将第一层 GAT 换成普通线性层。训练时间有所缩短，大约减少了 25%。
+
+|         | 0.1    | 0.116  | 0.133  | 0.15   | 0.166  | 0.183 | 0.2    | 0.216  | 0.233 | 0.25   |
+| ------- | ------ | ------ | ------ | ------ | ------ | ----- | ------ | ------ | ----- | ------ |
+| R nodes | 11.512 | 11.272 | 10.984 | 10.236 | 10.214 | 9.824 | 9.474  | 9.3    | 9.158 | 9.026  |
+| T nodes | 29.818 | 32.426 | 35.486 | 37.736 | 40.092 | 41.7  | 43.056 | 44.642 | 45.55 | 47.206 |
+
+效果略有下降。
+
+2. 第一层换成普通 GCN。效果大幅下降。
+3. 只用前 2 层 GAT。训练时间有所缩短，大约减少了 25%。
+
+
+|         | 0.1    | 0.116  | 0.133  | 0.15   | 0.166  | 0.183  | 0.2    | 0.216  | 0.233  | 0.25   |
+| ------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| R nodes | 11.334 | 11.008 | 10.574 | 10.092 | 9.706  | 9.798  | 9.128  | 9.33   | 9.188  | 8.61   |
+| T nodes | 30.76  | 33.376 | 35.986 | 38.036 | 40.032 | 41.296 | 42.768 | 44.208 | 44.914 | 46.804 |
+
+效果也略有下降。
+
+4. 只用第 1 层 GAT，然后学添加两个权重，学习 strucEmb 和 stateEmb 的结合。训练时间减少 46%。
+
+|         | 0.1    | 0.116 | 0.133  | 0.15   | 0.166  | 0.183  | 0.2    | 0.216  | 0.233 | 0.25   |
+| ------- | ------ | ----- | ------ | ------ | ------ | ------ | ------ | ------ | ----- | ------ |
+| R nodes | 11.492 | 11.51 | 10.89  | 10.564 | 10.324 | 9.77   | 9.848  | 9.962  | 9.44  | 8.946  |
+| T nodes | 29.602 | 32.66 | 35.032 | 37.758 | 39.782 | 41.798 | 42.834 | 44.354 | 44.96 | 46.706 |
+
+效果比3稍微差点。
+
+5. 在 4 的基础上，增加 head 数量。head 设置为 4. 训练时间减少 25%
+
+|         | 0.1    | 0.116  | 0.133  | 0.15   | 0.166  | 0.183  | 0.2    | 0.216  | 0.233  | 0.25  |
+| ------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ----- |
+| R nodes | 11.006 | 10.926 | 10.368 | 10.168 | 9.722  | 9.814  | 9.446  | 9.236  | 9.346  | 8.978 |
+| T nodes | 32.04  | 34.604 | 37.244 | 38.688 | 40.288 | 42.206 | 43.436 | 44.332 | 45.576 | 47.36 |
+
+效果基本持平目前最佳，就是 R nodes 数量稍微偏高一点。
+
+6. 在 4 的基础上，head 设置为 3.
+
+|         | 0.1    | 0.116  | 0.133  | 0.15   | 0.166  | 0.183  | 0.2    | 0.216  | 0.233  | 0.25   |
+| ------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| R nodes | 11.486 | 11.104 | 10.434 | 10.078 | 10.09  | 10.06  | 9.594  | 9.462  | 9.524  | 9.444  |
+| T nodes | 30.196 | 32.684 | 35.362 | 37.92  | 39.842 | 41.558 | 43.018 | 44.022 | 44.754 | 46.348 |
+
+感觉跟 4 差不多。（其实训练也挺玄学的。。。）
+
+7. 在 4 的基础上，head 设置为 2
+
+|         | 0.1    | 0.116  | 0.133  | 0.15   | 0.166  | 0.183  | 0.2    | 0.216  | 0.233  | 0.25   |
+| ------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| R nodes | 11.836 | 11.332 | 11.074 | 11.118 | 10.436 | 10.574 | 10.288 | 9.824  | 9.502  | 9.432  |
+| T nodes | 27.74  | 30.5   | 32.806 | 34.44  | 36.144 | 37.6   | 39.376 | 41.158 | 41.978 | 44.212 |
+
+效果变差

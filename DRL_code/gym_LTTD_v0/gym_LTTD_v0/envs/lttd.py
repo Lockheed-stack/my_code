@@ -17,8 +17,8 @@ class lttdENV(gym.Env):
         au_T_rate: float = 0.01,
         k_budget: float = 0.01,
         target_to_reach: float = 0,
-        alpha: float = 0.5,
-        R_score_base:float = 1.1
+        alpha: float = 0.8,
+        is_for_test:bool=False
     ) -> None:
         super().__init__()
 
@@ -31,7 +31,8 @@ class lttdENV(gym.Env):
             self.select_k_Tnodes = 1
         self.target_to_reach = target_to_reach
         self.alpha = alpha
-        self.R_score_base = R_score_base
+        self.is_for_test = is_for_test
+
         self.sorted_deg = sorted(
             dict(self.G.degree()).items(), key=lambda x: x[1], reverse=True
         )
@@ -39,6 +40,7 @@ class lttdENV(gym.Env):
         self.df = pd.DataFrame(
             self.G.degree, columns=["node", "degree"], dtype=int
         ).set_index("node")
+        self.median_degree = self.df["degree"].median()
         self.df_node_index = pd.DataFrame(
             self.G.nodes(), columns=["node"], dtype=int
         )  # the original nodes may be disordered
@@ -46,6 +48,7 @@ class lttdENV(gym.Env):
         self.stubborn_R = set()  # the seed of rumor nodes
         self.final_T_receiver = self._select_authoritative_T_nodes(au_T_rate)
         self.final_R_receiver = set()
+        self.recommend_nodes = set()
         self.actual_k_select = 0
 
         """
@@ -87,6 +90,7 @@ class lttdENV(gym.Env):
             self.au_T_rate)
         self.final_R_receiver = set()
         self.actual_k_select = 0
+        self.recommend_nodes = set()
         for node in nx.nodes(self.G):
             # influenced threshold
             self.G.nodes[node]["i_threshold"] = uniform(0, 1)
@@ -113,13 +117,12 @@ class lttdENV(gym.Env):
     def step(self, action: int):
         # the 'action' parameret is the index of real action. it's need to be transform.
         action = self.df_node_index.iloc[action]["node"]
+        self.G.nodes[action]["group"] = 2
+        self.final_T_receiver.add(action)
         self.actual_k_select += 1
-
+        self.recommend_nodes.discard(action)
         # It will not actually diffuse untill k T nodes are selected.
         if (self.actual_k_select + 1 <= self.select_k_Tnodes):
-            self.G.nodes[action]["group"] = 2
-            self.final_T_receiver.add(action)
-
             truncated = (
                 len(self.final_R_receiver | self.final_T_receiver) >= self.nodes_num
             )
@@ -129,8 +132,11 @@ class lttdENV(gym.Env):
             observation = self._get_obs()
             info = self._get_info()
             terminated = False
-            reward = self._reward_shaping(action)
-            # reward = 1e-3
+            if self.is_for_test:
+                reward = 0
+            else:
+                # reward = self._reward_shaping(action)
+                reward = 1
             return (
                 np.array(observation, dtype=np.int32),
                 reward,
@@ -140,15 +146,13 @@ class lttdENV(gym.Env):
             )
 
         # the last action is choosen, then the diffusion start.
-        self.G.nodes[action]["group"] = 2
-        self.final_T_receiver.add(action)
         return self._after_detected_diffusion()
 
     def _get_obs(self):
         return list(dict(self.G.nodes(data="group", default=0)).values())
 
     def _get_info(self):
-        return {"T_active": self.final_T_receiver, "R_active": self.final_R_receiver}
+        return {"T_active": self.final_T_receiver, "R_active": self.final_R_receiver, "recommend":self.recommend_nodes}
 
     def _new_correction_threshold(self, au_node, beta: float = 1, n_th_nbr: int = 3):
         """Updating correction thresholds for nodes which under the influence by au_T nodes.
@@ -186,9 +190,9 @@ class lttdENV(gym.Env):
                     checked_node[nbr] = 1
 
     def _select_authoritative_T_nodes(self, T_percent: float):
-        median_degree = self.df["degree"].median()
+        # median_degree = self.df["degree"].median()
 
-        ge_median_nodes = self.df.query(f"degree>={median_degree}")
+        ge_median_nodes = self.df.query(f"degree>={self.median_degree}")
 
         if (ge_median_nodes.shape[0] * T_percent) < 1:
             T_sample_df = ge_median_nodes.sample(1, replace=False)
@@ -348,6 +352,13 @@ class lttdENV(gym.Env):
                 self.G.nodes[new_gen_node]["group"] = 1
                 self.final_R_receiver.add(new_gen_node)
                 nothing_change = False
+        
+        # update recommend nodes
+        if not self.is_for_test:
+            for node in self.final_R_receiver:
+                for nbr in nx.neighbors(self.G,node):
+                    if self.G.nodes[nbr]['group'] == 0:
+                        self.recommend_nodes.add(nbr)
 
     def _after_detected_diffusion(self,):
         # the last action before after_detected_diffusion
@@ -447,60 +458,52 @@ class lttdENV(gym.Env):
         info = self._get_info()
         terminated = nothing_change
 
-        RN_rate = len(self.final_R_receiver) / self.nodes_num
-        # TR_rate = len(self.final_T_receiver) / len(self.final_R_receiver)
-
-        # actual_plan_k_rate = (self.actual_k_select) / (self.select_k_Tnodes)
-        # reward = (len(self.final_T_receiver)-len(self.final_R_receiver))
-        # if RN_rate <= self.target_to_reach:
-        #     reward *= 1.5
-        # elif TR_rate >= 5:
-        #     reward *= 1.5
-        # elif TR_rate >= 2:
-        #     reward *= 1.1
-
-        # delta_R = (R_start_num-len(self.final_R_receiver))
-        # delta_T = (len(self.final_T_receiver)-T_start_num)
-        # reward = self.alpha*(delta_R) + (1-self.alpha)*(delta_T)
-        if self.rest_avail_nodes_num <=self.select_k_Tnodes:
-            reward = self.rest_avail_nodes_num + (len(self.final_T_receiver)-T_start_num)
-        elif (len(self.final_R_receiver)-R_start_num)>0:
-            reward = 1/(RN_rate-1)
+        if self.is_for_test:
+            reward = 0
         else:
-            R_score = -log(RN_rate,self.R_score_base)
-            if self.alpha>=0:
-                reward = self.alpha*(R_score)+(1-self.alpha)*(len(self.final_T_receiver)-T_start_num)
-            else:
-                reward = (R_score)+(len(self.final_T_receiver)-T_start_num)
+            # RN_rate = len(self.final_R_receiver) / self.nodes_num
+            TR_rate = len(self.final_T_receiver) / len(self.final_R_receiver)
+
+            delta_R = (len(self.final_R_receiver)-R_start_num)
+            delta_T = (len(self.final_T_receiver)-T_start_num)
+
+            reward = delta_T-delta_R
+
+            if reward > 0:
+                # if RN_rate <= self.target_to_reach:
+                #     reward *= 2.3
+                if TR_rate >= self.target_to_reach:
+                    reward *= 3
+                elif TR_rate > max(self.target_to_reach/2,1):
+                    reward *= 2.2
 
         return np.array(observation, dtype=np.int32), reward, terminated, False, info
 
     def _reward_shaping(self, action: int):
-        delta_T = 0
-        delta_R = 0
+        
         R_around_num = 0
         # rough estimate influence
         for nbr in self.G.neighbors(action):
             if self.G.nodes[nbr]['group'] == 1:
-                R_around_num+=1
-                if self._check_c_threshold(nbr):
-                    delta_R += 1
-                    delta_T += 1
-            elif self.G.nodes[nbr]['group'] == 0:
-                if  self._check_i_threshold(action) == 2:
-                    delta_T += 1
+                R_around_num +=1
+        
+        reward = R_around_num + (self.G.degree(action)*self.alpha)
 
-        if self.alpha>=0:
-            if delta_R<=1 and R_around_num>0:
-                return self.alpha*R_around_num+(1-self.alpha)*delta_T
-            elif R_around_num==0 and delta_T==0:
-                return -1
-            
-            return self.alpha*(R_around_num*delta_R)+(1-self.alpha)*(delta_T)
-        else:
-            if delta_R<=1 and R_around_num>0:
-                return R_around_num+delta_T
-            elif R_around_num==0 and delta_T==0:
-                return -1
-            
-            return (R_around_num*delta_R)+(delta_T)
+        return reward
+        # checked_node = set()
+        # for node in (self.final_R_receiver|self.final_T_receiver):
+        #     for nbr in self.G.neighbors(node):
+        #         if nbr not in checked_node:
+        #             checked_node.add(nbr)
+        #             if self.G.nodes[nbr]['group'] ==1:
+        #                 if self._check_c_threshold(nbr):
+        #                     delta_R-=1
+        #                     delta_T+=1
+        #             elif self.G.nodes[nbr]['group']==0:
+        #                 check_res = self._check_i_threshold(nbr)
+        #                 if check_res ==2:
+        #                     delta_T+=1
+        #                 elif check_res == 1:
+        #                     delta_R+=1
+
+        # return delta_T-delta_R
